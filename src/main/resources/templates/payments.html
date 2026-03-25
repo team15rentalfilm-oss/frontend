@@ -1,0 +1,59 @@
+<!DOCTYPE html>
+<html xmlns:th="http://www.thymeleaf.org">
+<head>
+  <meta charset="UTF-8">
+  <title>Manage Payments</title>
+  <style>
+    body { font-family: 'Segoe UI', Tahoma, sans-serif; padding: 20px; background-color: #f4f7f6; color: #333; }
+    .header-container { display: flex; justify-content: space-between; align-items: center; border-bottom: 2px solid #3498db; padding-bottom: 10px; margin-bottom: 20px;}
+    table { width: 100%; border-collapse: collapse; background: white; box-shadow: 0 4px 6px rgba(0,0,0,0.05); border-radius: 8px; overflow: hidden; }
+    th, td { border-bottom: 1px solid #eee; padding: 12px 15px; text-align: left; }
+    th { background-color: #2c3e50; color: white; text-transform: uppercase; font-size: 14px; }
+    tr:hover { background-color: #f9f9f9; }
+    .btn { padding: 8px 12px; text-decoration: none; border-radius: 4px; color: white; display: inline-block; font-size: 14px; font-weight: bold;}
+    .btn-primary { background-color: #3498db; }
+    .btn-primary:hover { background-color: #2980b9; }
+    .btn-warning { background-color: #f39c12; margin-right: 5px; }
+    .btn-danger { background-color: #e74c3c; }
+    .back-link { text-decoration: none; color: #7f8c8d; font-weight: bold; }
+  </style>
+</head>
+<body>
+
+<a th:href="@{/member/utsav}" class="back-link">&larr; Back to Utsav's Profile</a>
+
+<div class="header-container">
+  <h1>Payment Management</h1>
+  <a th:href="@{/payments/new}" class="btn btn-primary">+ Add New Payment</a>
+</div>
+
+<table>
+  <thead>
+  <tr>
+    <th>Payment ID</th>
+    <th>Customer ID</th>
+    <th>Staff ID</th>
+    <th>Rental ID</th>
+    <th>Amount ($)</th>
+    <th>Payment Date</th>
+    <th>Actions</th>
+  </tr>
+  </thead>
+  <tbody>
+  <tr th:each="payment : ${payments}">
+    <td th:text="${payment.paymentId}"></td>
+    <td th:text="${payment.customerId}"></td>
+    <td th:text="${payment.staffId}"></td>
+    <td th:text="${payment.rentalId}"></td>
+    <td th:text="${payment.amount}"></td>
+    <td th:text="${#temporals.format(payment.paymentDate, 'yyyy-MM-dd HH:mm')}"></td>
+    <td>
+      <a th:href="@{/payments/edit/{id}(id=${payment.paymentId})}" class="btn btn-warning">Edit</a>
+      <a th:href="@{/payments/delete/{id}(id=${payment.paymentId})}" class="btn btn-danger" onclick="return confirm('Delete this payment?')">Delete</a>
+    </td>
+  </tr>
+  </tbody>
+</table>
+
+</body>
+</html>

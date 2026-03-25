@@ -1,0 +1,15 @@
+<!DOCTYPE html>
+<html xmlns:th="http://www.thymeleaf.org">
+<head>
+    <title>Store List</title>
+</head>
+<tbody>
+<tr th:each="store : ${stores}">
+    <td th:text="${store['storeId']}"></td>
+
+    <td th:text="${store['managerStaffId']}"></td>
+
+    <td th:text="${store['addressId']}"></td>
+</tr>
+</tbody>
+</html>

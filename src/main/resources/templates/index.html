@@ -1,0 +1,126 @@
+<!DOCTYPE html>
+<html xmlns:th="http://www.thymeleaf.org">
+<head>
+    <meta charset="UTF-8">
+    <title>Team 15 - Film Rental Store</title>
+    <style>
+        body {
+            font-family: 'Segoe UI', Tahoma, Geneva, Verdana, sans-serif;
+            background-color: #f4f7f6;
+            color: #333;
+            max-width: 800px;
+            margin: 0 auto;
+            padding: 40px 20px;
+        }
+        h1 {
+            text-align: center;
+            color: #2c3e50;
+            border-bottom: 2px solid #3498db;
+            padding-bottom: 10px;
+            margin-bottom: 40px;
+        }
+        .team-list {
+            display: flex;
+            flex-direction: column;
+            gap: 20px;
+        }
+        .member-card {
+            display: flex;
+            align-items: center;
+            background: white;
+            border: 1px solid #e1e8ed;
+            border-radius: 10px;
+            padding: 20px;
+            box-shadow: 0 4px 6px rgba(0,0,0,0.05);
+            transition: transform 0.2s, box-shadow 0.2s;
+        }
+        .member-card:hover {
+            transform: translateY(-3px);
+            box-shadow: 0 6px 12px rgba(0,0,0,0.1);
+        }
+        .member-photo {
+            width: 100px;
+            height: 100px;
+            border-radius: 50%;
+            object-fit: cover;
+            margin-right: 25px;
+            border: 3px solid #3498db;
+            background-color: #ecf0f1; /* Fallback color if image is missing */
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            color: #7f8c8d;
+            font-size: 12px;
+        }
+        .member-info {
+            flex-grow: 1;
+        }
+        .member-name {
+            font-size: 1.4em;
+            font-weight: bold;
+            color: #2980b9;
+            text-decoration: none;
+            display: inline-block;
+            margin-bottom: 5px;
+        }
+        .member-name:hover {
+            color: #1abc9c;
+            text-decoration: underline;
+        }
+        .member-role {
+            color: #7f8c8d;
+            font-size: 0.95em;
+            margin: 0;
+        }
+    </style>
+</head>
+<body>
+
+<h1>Film Rental Store</h1>
+
+<div class="team-list">
+
+    <div class="member-card">
+        <img class="member-photo" th:src="@{/images/anwesha.jpg}" alt="Anwesha Ghosh">
+        <div class="member-info">
+            <a th:href="@{/member/anwesha}" class="member-name">Anwesha Ghosh</a>
+            <p class="member-role">Film, Film_Category & Category Entities</p>
+        </div>
+    </div>
+
+    <div class="member-card">
+        <img class="member-photo" th:src="@{/images/harshita.jpg}" alt="Harshita Dujari">
+        <div class="member-info">
+            <a th:href="@{/member/harshita}" class="member-name">Harshita Dujari</a>
+            <p class="member-role">Language, Film_Actor & Actor Entities</p>
+        </div>
+    </div>
+
+    <div class="member-card">
+        <img class="member-photo" th:src="@{/images/mafuj.jpg}" alt="Mafuj Gazi">
+        <div class="member-info">
+            <a th:href="@{/member/mafuj}" class="member-name">Mafuj Gazi</a>
+            <p class="member-role">Address, City, Country & Customer Entities</p>
+        </div>
+    </div>
+
+    <div class="member-card">
+        <img class="member-photo" th:src="@{/images/shreyash.jpg}" alt="Shreyash Singh">
+        <div class="member-info">
+            <a th:href="@{/member/shreyash}" class="member-name">Shreyash Singh</a>
+            <p class="member-role"> Store, Inventory & Film_Text Entities</p>
+        </div>
+    </div>
+
+    <div class="member-card">
+        <img class="member-photo" th:src="@{/images/utsav.jpg}" alt="Utsav Sarda">
+        <div class="member-info">
+            <a th:href="@{/member/utsav}" class="member-name">Utsav Sarda</a>
+            <p class="member-role">Staff ,Payment & Rental Entities</p>
+        </div>
+    </div>
+
+</div>
+
+</body>
+</html>
