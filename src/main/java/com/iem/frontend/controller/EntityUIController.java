@@ -1,5 +1,6 @@
 package com.iem.frontend.controller;
 
+import com.iem.frontend.dto.PaymentDTO;
 import com.iem.frontend.dto.StoreDTO;
 import org.springframework.stereotype.Controller;
 import org.springframework.ui.Model;
@@ -22,11 +23,9 @@ public class EntityUIController {
 
     @GetMapping("/payments")
     public String viewPayments(Model model) {
-        // 1. Fetch JSON array from Backend
-        Object[] payments = restTemplate.getForObject(BACKEND_API + "/payments", Object[].class);
-        // 2. Add it to the model so Thymeleaf can use ${payments}
+        // Use PaymentDTO[].class so Jackson converts the date string to LocalDateTime
+        PaymentDTO[] payments = restTemplate.getForObject(BACKEND_API + "/payments", PaymentDTO[].class);
         model.addAttribute("payments", payments);
-        // 3. Return the HTML file name (payments.html)
         return "payments";
     }
 
