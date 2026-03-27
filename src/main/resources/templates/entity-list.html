@@ -1,0 +1,43 @@
+<!DOCTYPE html>
+<html xmlns:th="http://www.thymeleaf.org">
+<head>
+    <meta charset="UTF-8">
+    <title th:text="${pageTitle}">Entity Management</title>
+    <style>
+        body { font-family: 'Segoe UI', Tahoma, sans-serif; padding: 20px; background-color: #f4f7f6; color: #333; }
+        .header-container { display: flex; justify-content: space-between; align-items: center; border-bottom: 2px solid #3498db; padding-bottom: 10px; margin-bottom: 20px; gap: 16px; }
+        .back-link { text-decoration: none; color: #7f8c8d; font-weight: bold; }
+        table { width: 100%; border-collapse: collapse; background: white; box-shadow: 0 4px 6px rgba(0,0,0,0.05); border-radius: 8px; overflow: hidden; }
+        th, td { border-bottom: 1px solid #eee; padding: 12px 15px; text-align: left; vertical-align: top; }
+        th { background-color: #2c3e50; color: white; text-transform: uppercase; font-size: 14px; }
+        tr:hover { background-color: #f9f9f9; }
+        .empty-state { background: white; padding: 20px; border-radius: 8px; box-shadow: 0 4px 6px rgba(0,0,0,0.05); }
+    </style>
+</head>
+<body>
+
+<a th:href="@{/}" class="back-link">&larr; Back to Team Roster</a>
+
+<div class="header-container">
+    <h1 th:text="${pageTitle}">Entity Management</h1>
+</div>
+
+<div th:if="${#lists.isEmpty(rows)}" class="empty-state">
+    No records found.
+</div>
+
+<table th:unless="${#lists.isEmpty(rows)}">
+    <thead>
+    <tr>
+        <th th:each="column : ${columns}" th:text="${column}"></th>
+    </tr>
+    </thead>
+    <tbody>
+    <tr th:each="row : ${rows}">
+        <td th:each="column : ${columns}" th:text="${row[column]}"></td>
+    </tr>
+    </tbody>
+</table>
+
+</body>
+</html>
