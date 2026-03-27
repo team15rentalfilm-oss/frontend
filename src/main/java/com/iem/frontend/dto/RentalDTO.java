@@ -2,16 +2,15 @@ package com.iem.frontend.dto;
 
 import lombok.Data;
 
-import java.math.BigDecimal;
 import java.time.LocalDateTime;
 
 @Data
-public class PaymentDTO {
-    private Integer paymentId;
-    private Integer customerId;
-    private Integer staffId;
+public class RentalDTO {
     private Integer rentalId;
-    private BigDecimal amount;
-    private LocalDateTime paymentDate;
+    private LocalDateTime rentalDate;
+    private Long inventoryId;
+    private Integer customerId;
+    private LocalDateTime returnDate;
+    private Integer staffId;
     private LocalDateTime lastUpdate;
 }

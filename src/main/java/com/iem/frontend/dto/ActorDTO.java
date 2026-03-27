@@ -5,9 +5,9 @@ import lombok.Data;
 import java.time.LocalDateTime;
 
 @Data
-public class StoreDTO {
-    private Integer storeId;
-    private Integer managerStaffId;
-    private Integer addressId;
+public class ActorDTO {
+    private Integer actorId;
+    private String firstName;
+    private String lastName;
     private LocalDateTime lastUpdate;
 }
