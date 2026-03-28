@@ -1,229 +1,434 @@
 package com.iem.frontend.controller;
 
-import com.iem.frontend.dto.*;
-import org.springframework.beans.BeanWrapper;
-import org.springframework.beans.BeanWrapperImpl;
+import com.fasterxml.jackson.core.JsonProcessingException;
+import com.fasterxml.jackson.core.type.TypeReference;
+import com.fasterxml.jackson.databind.JsonNode;
+import com.fasterxml.jackson.databind.ObjectMapper;
+import com.iem.frontend.catalog.ExplorerCatalog;
+import com.iem.frontend.catalog.ExplorerCatalog.EndpointDefinition;
+import com.iem.frontend.catalog.ExplorerCatalog.EntityDefinition;
+import com.iem.frontend.catalog.ExplorerCatalog.MemberDefinition;
+import org.springframework.http.MediaType;
+import org.springframework.http.ResponseEntity;
 import org.springframework.stereotype.Controller;
 import org.springframework.ui.Model;
 import org.springframework.web.bind.annotation.GetMapping;
-import org.springframework.web.client.RestTemplate;
+import org.springframework.web.bind.annotation.PathVariable;
+import org.springframework.web.bind.annotation.PostMapping;
+import org.springframework.web.bind.annotation.RequestBody;
+import org.springframework.web.bind.annotation.ResponseBody;
+import org.springframework.web.server.ResponseStatusException;
+import jakarta.servlet.http.HttpServletRequest;
 
+import java.io.IOException;
+import java.net.URI;
+import java.net.URISyntaxException;
+import java.net.http.HttpClient;
+import java.net.http.HttpRequest;
+import java.net.http.HttpResponse;
+import java.time.Duration;
+import java.util.ArrayList;
 import java.util.Arrays;
 import java.util.LinkedHashMap;
 import java.util.List;
+import java.util.Locale;
 import java.util.Map;
+import java.util.regex.Matcher;
+import java.util.regex.Pattern;
+
+import static org.springframework.http.HttpStatus.BAD_GATEWAY;
+import static org.springframework.http.HttpStatus.BAD_REQUEST;
+import static org.springframework.http.HttpStatus.NOT_FOUND;
 
 @Controller
 public class EntityUIController {
 
-    private final RestTemplate restTemplate = new RestTemplate();
+    private static final int PREVIEW_LIMIT = 8;
+    private static final Pattern PATH_VARIABLE_PATTERN = Pattern.compile("\\{([^/{}]+)}");
 
-    private final String BACKEND_API = "http://localhost:8081/api";
+    private final HttpClient httpClient = HttpClient.newBuilder()
+            .connectTimeout(Duration.ofSeconds(5))
+            .build();
 
-    // UTSAV'S ENTITIES
+    private final ObjectMapper objectMapper = new ObjectMapper();
 
-    @GetMapping("/payments")
-    public String viewPayments(Model model) {
-        PaymentDTO[] payments = restTemplate.getForObject(BACKEND_API + "/payments", PaymentDTO[].class);
-        model.addAttribute("payments", payments);
-        return "payments";
-    }
+    @GetMapping("/entities/{entityKey}")
+    public String viewEntity(@PathVariable String entityKey, Model model) {
+        EntityDefinition entity = ExplorerCatalog.entity(entityKey);
+        if (entity == null) {
+            throw new ResponseStatusException(NOT_FOUND, "Unknown entity: " + entityKey);
+        }
 
-    @GetMapping("/staff")
-    public String viewStaff(Model model) {
-        return renderEntityList(
-                model,
-                "Staff Management",
-                "staff",
-                List.of("staffId", "firstName", "lastName", "addressId", "email", "storeId", "active", "username", "lastUpdate"),
-                StaffDTO[].class
-        );
-    }
+        MemberDefinition member = ExplorerCatalog.member(entity.memberKey());
+        PreviewData previewData = fetchPreview(entity.collectionPath());
 
-    @GetMapping("/rentals")
-    public String viewRentals(Model model) {
-        return renderEntityList(
-                model,
-                "Rental Management",
-                "rentals",
-                List.of("rentalId", "rentalDate", "inventoryId", "customerId", "returnDate", "staffId", "lastUpdate"),
-                RentalDTO[].class
-        );
-    }
-
-    // SHREYASH'S ENTITIES
-
-    @GetMapping("/stores")
-    public String viewStores(Model model) {
-        StoreDTO[] stores = restTemplate.getForObject(BACKEND_API + "/stores", StoreDTO[].class);
-        model.addAttribute("stores", stores);
-        return "stores";
-    }
-
-    @GetMapping("/inventory")
-    public String viewInventory(Model model) {
-        return renderEntityList(
-                model,
-                "Inventory Management",
-                "inventory",
-                List.of("inventoryId", "filmId", "storeId", "lastUpdate"),
-                InventoryDTO[].class
-        );
-    }
-
-    @GetMapping("/film-text")
-    public String viewFilmText(Model model) {
-        return renderEntityList(
-                model,
-                "Film Text Management",
-                "filmText",
-                List.of("filmId", "title", "description"),
-                FilmTextDTO[].class
-        );
-    }
-
-    // HARSHITA'S ENTITIES
-
-    @GetMapping("/languages")
-    public String viewLanguages(Model model) {
-        return renderEntityList(
-                model,
-                "Language Management",
-                "languages",
-                List.of("languageId", "name", "lastUpdate"),
-                LanguageDTO[].class
-        );
-    }
-
-    @GetMapping("/film-actors")
-    public String viewFilmActors(Model model) {
-        return renderEntityList(
-                model,
-                "Film Actor Management",
-                "filmActors",
-                List.of("actorId", "filmId", "lastUpdate"),
-                FilmActorDTO[].class
-        );
-    }
-
-    @GetMapping("/actors")
-    public String viewActors(Model model) {
-        return renderEntityList(
-                model,
-                "Actor Management",
-                "actors",
-                List.of("actorId", "firstName", "lastName", "lastUpdate"),
-                ActorDTO[].class
-        );
-    }
-
-    // MAFUJ'S ENTITIES
-
-    @GetMapping("/addresses")
-    public String viewAddresses(Model model) {
-        return renderEntityList(
-                model,
-                "Address Management",
-                "addresses",
-                List.of("addressId", "address", "address2", "district", "cityId", "postalCode", "phone", "location", "lastUpdate"),
-                AddressDTO[].class
-        );
-    }
-
-    @GetMapping("/cities")
-    public String viewCities(Model model) {
-        return renderEntityList(
-                model,
-                "City Management",
-                "cities",
-                List.of("cityId", "city", "countryId", "lastUpdate"),
-                CityDTO[].class
-        );
-    }
-
-    @GetMapping("/countries")
-    public String viewCountries(Model model) {
-        return renderEntityList(
-                model,
-                "Country Management",
-                "countries",
-                List.of("countryId", "country", "lastUpdate"),
-                CountryDTO[].class
-        );
-    }
-
-    @GetMapping("/customers")
-    public String viewCustomers(Model model) {
-        return renderEntityList(
-                model,
-                "Customer Management",
-                "customers",
-                List.of("customerId", "storeId", "firstName", "lastName", "email", "addressId", "active", "createDate", "lastUpdate"),
-                CustomerDTO[].class
-        );
-    }
-
-    // ANWESHA'S ENTITIES
-
-    @GetMapping("/films")
-    public String viewFilms(Model model) {
-        return renderEntityList(
-                model,
-                "Film Management",
-                "films",
-                List.of("filmId", "title", "description", "releaseYear", "languageId", "originalLanguageId", "rentalDuration", "rentalRate", "length", "replacementCost", "rating", "specialFeatures", "lastUpdate"),
-                FilmDTO[].class
-        );
-    }
-
-    @GetMapping("/film-categories")
-    public String viewFilmCategories(Model model) {
-        return renderEntityList(
-                model,
-                "Film Category Management",
-                "filmCategories",
-                List.of("filmId", "categoryId", "lastUpdate"),
-                FilmCategoryDTO[].class
-        );
-    }
-
-    @GetMapping("/categories")
-    public String viewCategories(Model model) {
-        return renderEntityList(
-                model,
-                "Category Management",
-                "categories",
-                List.of("categoryId", "name", "lastUpdate"),
-                CategoryDTO[].class
-        );
-    }
-
-    private <T> String renderEntityList(
-            Model model,
-            String pageTitle,
-            String entityName,
-            List<String> columns,
-            Class<T[]> responseType
-    ) {
-        T[] response = restTemplate.getForObject(BACKEND_API + "/" + entityName, responseType);
-        model.addAttribute("pageTitle", pageTitle);
-        model.addAttribute("entityName", entityName);
-        model.addAttribute("columns", columns);
-        model.addAttribute(
-                "rows",
-                response == null
-                        ? List.of()
-                        : Arrays.stream(response).map(row -> toRowMap(row, columns)).toList()
-        );
+        model.addAttribute("entity", entity);
+        model.addAttribute("member", member);
+        model.addAttribute("baseUrl", ExplorerCatalog.BASE_API_URL);
+        model.addAttribute("openApiPath", ExplorerCatalog.OPEN_API_PATH);
+        model.addAttribute("previewColumns", previewData.columns().isEmpty() ? entity.schemaFields() : previewData.columns());
+        model.addAttribute("previewRows", previewData.rows());
+        model.addAttribute("previewError", previewData.error());
+        model.addAttribute("endpointConfigsJson", toEndpointConfigJson(entity));
         return "entity-list";
     }
 
-    private Map<String, Object> toRowMap(Object source, List<String> columns) {
-        BeanWrapper beanWrapper = new BeanWrapperImpl(source);
-        Map<String, Object> row = new LinkedHashMap<>();
-        for (String column : columns) {
-            row.put(column, beanWrapper.getPropertyValue(column));
+    @GetMapping({
+            "/actors",
+            "/categories",
+            "/customers",
+            "/films",
+            "/languages",
+            "/payments",
+            "/rentals",
+            "/staff",
+            "/stores"
+    })
+    public String legacyPluralRoute(HttpServletRequest request) {
+        return redirectLegacyPath(request);
+    }
+
+    @GetMapping({
+            "/film-actor",
+            "/film-actors",
+            "/film-text",
+            "/film-texts",
+            "/inventory",
+            "/inventories"
+    })
+    public String legacyMixedRoute(HttpServletRequest request) {
+        return redirectLegacyPath(request);
+    }
+
+    @PostMapping(value = "/ui/api-explorer/execute", consumes = MediaType.APPLICATION_JSON_VALUE, produces = MediaType.APPLICATION_JSON_VALUE)
+    @ResponseBody
+    public ResponseEntity<ApiExplorerResponse> execute(@RequestBody ApiExplorerRequest request) {
+        String method = request.method() == null ? "" : request.method().trim().toUpperCase(Locale.ROOT);
+        String path = request.path() == null ? "" : request.path().trim();
+
+        if (method.isEmpty() || path.isEmpty()) {
+            return ResponseEntity.ok()
+                    .body(ApiExplorerResponse.error(BAD_REQUEST.value(), "Method and path are required."));
         }
+        if (!path.startsWith("/")) {
+            return ResponseEntity.ok()
+                    .body(ApiExplorerResponse.error(BAD_REQUEST.value(), "Path must start with '/'."));
+        }
+
+        try {
+            HttpRequest backendRequest = buildBackendRequest(method, path, request.body());
+            HttpResponse<String> backendResponse = httpClient.send(backendRequest, HttpResponse.BodyHandlers.ofString());
+
+            return ResponseEntity.ok()
+                    .body(new ApiExplorerResponse(
+                            backendResponse.statusCode(),
+                            method,
+                            path,
+                            prettyBody(backendResponse.body()),
+                            backendResponse.headers().map(),
+                            null
+                    ));
+        } catch (IllegalArgumentException ex) {
+            return ResponseEntity.ok()
+                    .body(ApiExplorerResponse.error(BAD_REQUEST.value(), ex.getMessage()));
+        } catch (IOException | InterruptedException ex) {
+            if (ex instanceof InterruptedException) {
+                Thread.currentThread().interrupt();
+            }
+            return ResponseEntity.ok()
+                    .body(ApiExplorerResponse.error(BAD_GATEWAY.value(), "Backend request failed: " + ex.getMessage()));
+        }
+    }
+
+    private String redirectLegacyPath(HttpServletRequest request) {
+        String entityKey = switch (request.getRequestURI()) {
+            case "/actors" -> "actors";
+            case "/categories" -> "categories";
+            case "/customers" -> "customers";
+            case "/films" -> "films";
+            case "/languages" -> "languages";
+            case "/payments" -> "payments";
+            case "/rentals" -> "rentals";
+            case "/staff" -> "staff";
+            case "/stores" -> "stores";
+            case "/film-actor", "/film-actors" -> "filmActor";
+            case "/film-text", "/film-texts" -> "filmTexts";
+            case "/inventory", "/inventories" -> "inventories";
+            default -> null;
+        };
+
+        if (entityKey == null) {
+            throw new ResponseStatusException(NOT_FOUND, "Unknown legacy route: " + request.getRequestURI());
+        }
+        return "redirect:/entities/" + entityKey;
+    }
+
+    private HttpRequest buildBackendRequest(String method, String path, String body) {
+        URI uri;
+        try {
+            uri = new URI(ExplorerCatalog.BASE_API_URL + path);
+        } catch (URISyntaxException ex) {
+            throw new IllegalArgumentException("Invalid path or query string.");
+        }
+
+        HttpRequest.Builder builder = HttpRequest.newBuilder(uri)
+                .timeout(Duration.ofSeconds(20))
+                .header("Accept", "application/json");
+
+        boolean hasBody = body != null && !body.isBlank();
+        if (hasBody) {
+            builder.header("Content-Type", "application/json");
+        }
+
+        return switch (method) {
+            case "GET" -> builder.GET().build();
+            case "DELETE" -> builder.DELETE().build();
+            case "POST", "PUT", "PATCH" -> builder.method(method, HttpRequest.BodyPublishers.ofString(hasBody ? body : "")).build();
+            default -> throw new IllegalArgumentException("Unsupported method: " + method);
+        };
+    }
+
+    private PreviewData fetchPreview(String collectionPath) {
+        try {
+            HttpRequest request = HttpRequest.newBuilder(URI.create(ExplorerCatalog.BASE_API_URL + collectionPath))
+                    .timeout(Duration.ofSeconds(10))
+                    .header("Accept", "application/json")
+                    .GET()
+                    .build();
+
+            HttpResponse<String> response = httpClient.send(request, HttpResponse.BodyHandlers.ofString());
+            if (response.statusCode() < 200 || response.statusCode() >= 300) {
+                return new PreviewData(List.of(), List.of(), "Preview unavailable. Backend returned HTTP " + response.statusCode() + ".");
+            }
+
+            JsonNode root = objectMapper.readTree(response.body());
+            if (root == null || root.isNull()) {
+                return new PreviewData(List.of(), List.of(), "Preview returned no data.");
+            }
+
+            List<Map<String, Object>> rows = new ArrayList<>();
+            if (root.isArray()) {
+                for (JsonNode node : root) {
+                    rows.add(normalizeRow(node));
+                    if (rows.size() == PREVIEW_LIMIT) {
+                        break;
+                    }
+                }
+            } else {
+                rows.add(normalizeRow(root));
+            }
+
+            List<String> columns = rows.isEmpty()
+                    ? List.of()
+                    : new ArrayList<>(rows.get(0).keySet());
+
+            return new PreviewData(columns, rows, null);
+        } catch (IOException | InterruptedException ex) {
+            if (ex instanceof InterruptedException) {
+                Thread.currentThread().interrupt();
+            }
+            return new PreviewData(List.of(), List.of(), "Preview unavailable. Confirm the backend is running on " + ExplorerCatalog.BASE_API_URL + ".");
+        }
+    }
+
+    private Map<String, Object> normalizeRow(JsonNode node) {
+        if (node.isObject()) {
+            Map<String, Object> row = objectMapper.convertValue(node, new TypeReference<LinkedHashMap<String, Object>>() {
+            });
+            row.replaceAll((key, value) -> simplifyValue(value));
+            return row;
+        }
+
+        Map<String, Object> row = new LinkedHashMap<>();
+        row.put("value", simplifyValue(objectMapper.convertValue(node, Object.class)));
         return row;
+    }
+
+    private Object simplifyValue(Object value) {
+        if (value instanceof Map<?, ?> || value instanceof List<?>) {
+            try {
+                return objectMapper.writeValueAsString(value);
+            } catch (JsonProcessingException ex) {
+                return String.valueOf(value);
+            }
+        }
+        return value;
+    }
+
+    private String toEndpointConfigJson(EntityDefinition entity) {
+        List<Map<String, Object>> endpointConfigs = entity.endpoints().stream()
+                .map(endpoint -> {
+                    Map<String, Object> config = new LinkedHashMap<>();
+                    config.put("label", endpoint.label());
+                    config.put("method", endpoint.method());
+                    config.put("path", endpoint.path());
+                    config.put("notes", endpoint.notes());
+                    config.put("bodySchema", endpoint.bodySchema());
+                    config.put("responseSchema", endpoint.responseSchema());
+                    config.put("displayLine", endpoint.displayLine());
+                    config.put("pathFields", buildPathFields(endpoint));
+                    config.put("queryFields", buildQueryFields(entity, endpoint));
+                    config.put("bodyFields", buildBodyFields(entity, endpoint));
+                    return config;
+                })
+                .toList();
+
+        try {
+            return objectMapper.writeValueAsString(endpointConfigs);
+        } catch (JsonProcessingException ex) {
+            throw new IllegalStateException("Could not serialize endpoint configuration.", ex);
+        }
+    }
+
+    private List<FieldConfig> buildPathFields(EndpointDefinition endpoint) {
+        List<FieldConfig> fields = new ArrayList<>();
+        Matcher matcher = PATH_VARIABLE_PATTERN.matcher(endpoint.path());
+        while (matcher.find()) {
+            String field = matcher.group(1);
+            fields.add(fieldConfig(field, inferFieldType(field), false));
+        }
+        return fields;
+    }
+
+    private List<FieldConfig> buildQueryFields(EntityDefinition entity, EndpointDefinition endpoint) {
+        String overrideKey = entity.key() + ":" + endpoint.method() + ":" + endpoint.path();
+        return switch (overrideKey) {
+            case "payments:GET:/api/payments?customerId=" -> List.of(
+                    fieldConfig("customerId", "number", true),
+                    fieldConfig("staffId", "number", true),
+                    fieldConfig("rentalId", "number", true)
+            );
+            case "rentals:GET:/api/rentals?customerId=" -> List.of(
+                    fieldConfig("customerId", "number", true),
+                    fieldConfig("inventoryId", "number", true),
+                    fieldConfig("staffId", "number", true)
+            );
+            default -> buildQueryFieldsFromPath(endpoint.path());
+        };
+    }
+
+    private List<FieldConfig> buildQueryFieldsFromPath(String path) {
+        int index = path.indexOf('?');
+        if (index < 0 || index == path.length() - 1) {
+            return List.of();
+        }
+
+        String query = path.substring(index + 1);
+        return Arrays.stream(query.split("&"))
+                .map(part -> part.contains("=") ? part.substring(0, part.indexOf('=')) : part)
+                .filter(part -> !part.isBlank())
+                .map(field -> fieldConfig(field, inferFieldType(field), true))
+                .toList();
+    }
+
+    private List<FieldConfig> buildBodyFields(EntityDefinition entity, EndpointDefinition endpoint) {
+        if (endpoint.bodySchema() == null) {
+            return List.of();
+        }
+
+        List<String> fields = switch (entity.key() + ":" + endpoint.method()) {
+            case "inventories:PATCH" -> List.of("filmId", "storeId");
+            case "filmTexts:PATCH" -> List.of("title", "description");
+            default -> endpoint.bodySchema().toLowerCase(Locale.ROOT).contains("partial")
+                    ? entity.schemaFields().stream().filter(field -> !field.equals("id") && !field.endsWith("Id")).toList()
+                    : entity.schemaFields();
+        };
+
+        return fields.stream()
+                .map(field -> fieldConfig(field, inferFieldType(field), false))
+                .toList();
+    }
+
+    private FieldConfig fieldConfig(String field, String type, boolean optional) {
+        return new FieldConfig(field, labelize(field), type, optional, placeholderFor(field, type));
+    }
+
+    private String inferFieldType(String field) {
+        String normalized = field.toLowerCase(Locale.ROOT);
+        if (normalized.endsWith("ids") || normalized.contains("features")) {
+            return "list";
+        }
+        if (normalized.endsWith("id") || normalized.contains("year") || normalized.contains("duration") || normalized.contains("length")) {
+            return "number";
+        }
+        if (normalized.contains("amount") || normalized.contains("rate") || normalized.contains("cost")) {
+            return "decimal";
+        }
+        if (normalized.contains("active")) {
+            return "boolean";
+        }
+        if (normalized.contains("date") || normalized.contains("update")) {
+            return "datetime";
+        }
+        if (normalized.contains("email")) {
+            return "email";
+        }
+        return "text";
+    }
+
+    private String labelize(String field) {
+        StringBuilder builder = new StringBuilder();
+        for (int i = 0; i < field.length(); i++) {
+            char current = field.charAt(i);
+            if (i == 0) {
+                builder.append(Character.toUpperCase(current));
+                continue;
+            }
+            if (Character.isUpperCase(current)) {
+                builder.append(' ');
+            }
+            builder.append(current);
+        }
+        return builder.toString();
+    }
+
+    private String placeholderFor(String field, String type) {
+        return switch (type) {
+            case "number" -> "Enter " + field;
+            case "decimal" -> "0.00";
+            case "datetime" -> "2026-03-28T00:00:00";
+            case "email" -> "name@example.com";
+            case "list" -> "value1, value2";
+            default -> "Enter " + field;
+        };
+    }
+
+    private String prettyBody(String body) {
+        if (body == null || body.isBlank()) {
+            return "";
+        }
+        try {
+            return objectMapper.readTree(body).toPrettyString();
+        } catch (JsonProcessingException ex) {
+            return body;
+        }
+    }
+
+    private record PreviewData(List<String> columns, List<Map<String, Object>> rows, String error) {
+    }
+
+    public record ApiExplorerRequest(String method, String path, String body) {
+    }
+
+    public record ApiExplorerResponse(
+            int status,
+            String method,
+            String path,
+            String body,
+            Map<String, List<String>> headers,
+            String error
+    ) {
+        public static ApiExplorerResponse error(int status, String errorMessage) {
+            return new ApiExplorerResponse(status, null, null, null, Map.of(), errorMessage);
+        }
+    }
+
+    public record FieldConfig(
+            String name,
+            String label,
+            String type,
+            boolean optional,
+            String placeholder
+    ) {
     }
 }

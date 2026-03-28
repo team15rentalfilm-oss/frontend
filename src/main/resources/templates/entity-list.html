@@ -2,42 +2,635 @@
 <html xmlns:th="http://www.thymeleaf.org">
 <head>
     <meta charset="UTF-8">
-    <title th:text="${pageTitle}">Entity Management</title>
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title th:text="${entity.displayName + ' - Film Rental Store'}">Entity</title>
     <style>
-        body { font-family: 'Segoe UI', Tahoma, sans-serif; padding: 20px; background-color: #f4f7f6; color: #333; }
-        .header-container { display: flex; justify-content: space-between; align-items: center; border-bottom: 2px solid #3498db; padding-bottom: 10px; margin-bottom: 20px; gap: 16px; }
-        .back-link { text-decoration: none; color: #7f8c8d; font-weight: bold; }
-        table { width: 100%; border-collapse: collapse; background: white; box-shadow: 0 4px 6px rgba(0,0,0,0.05); border-radius: 8px; overflow: hidden; }
-        th, td { border-bottom: 1px solid #eee; padding: 12px 15px; text-align: left; vertical-align: top; }
-        th { background-color: #2c3e50; color: white; text-transform: uppercase; font-size: 14px; }
-        tr:hover { background-color: #f9f9f9; }
-        .empty-state { background: white; padding: 20px; border-radius: 8px; box-shadow: 0 4px 6px rgba(0,0,0,0.05); }
+        body {
+            margin: 0;
+            font-family: "Segoe UI", Tahoma, sans-serif;
+            background: #0f1115;
+            color: #f3f4f6;
+        }
+
+        .shell {
+            max-width: 1180px;
+            margin: 0 auto;
+            padding: 24px 18px 36px;
+        }
+
+        .back-link {
+            color: #b6bcc8;
+            text-decoration: none;
+            font-size: 0.95rem;
+        }
+
+        .header {
+            margin: 16px 0 20px;
+        }
+
+        .header h1 {
+            margin: 0 0 6px;
+            font-size: 2rem;
+            font-weight: 600;
+        }
+
+        .header p {
+            margin: 0;
+            color: #9ca3af;
+        }
+
+        .layout {
+            display: grid;
+            grid-template-columns: 280px minmax(0, 1fr);
+            gap: 18px;
+        }
+
+        .panel {
+            background: #171a21;
+            border: 1px solid #22262e;
+            border-radius: 14px;
+            padding: 16px;
+        }
+
+        .panel h2 {
+            margin: 0 0 14px;
+            font-size: 1rem;
+            font-weight: 600;
+        }
+
+        .endpoint-list {
+            display: grid;
+            gap: 10px;
+        }
+
+        .endpoint-card {
+            padding: 12px;
+            border: 1px solid #22262e;
+            border-radius: 10px;
+            background: #171a21;
+            cursor: pointer;
+        }
+
+        .endpoint-card.active {
+            border-color: #f3f4f6;
+        }
+
+        .endpoint-method {
+            display: inline-block;
+            margin-bottom: 8px;
+            font-size: 0.76rem;
+            font-weight: 600;
+            color: #b6bcc8;
+        }
+
+        .endpoint-card p {
+            margin: 0;
+            font-size: 0.9rem;
+            color: #d1d5db;
+            word-break: break-word;
+        }
+
+        .content {
+            display: grid;
+            gap: 18px;
+        }
+
+        .field-grid {
+            display: grid;
+            grid-template-columns: repeat(auto-fit, minmax(180px, 1fr));
+            gap: 12px;
+        }
+
+        .field-group {
+            display: grid;
+            gap: 8px;
+        }
+
+        .field-section {
+            margin-top: 14px;
+        }
+
+        .field-section h3 {
+            margin: 0 0 10px;
+            font-size: 0.95rem;
+            font-weight: 600;
+        }
+
+        label {
+            display: grid;
+            gap: 6px;
+            font-size: 0.9rem;
+            color: #d1d5db;
+        }
+
+        input,
+        select {
+            width: 100%;
+            padding: 10px 12px;
+            border: 1px solid #2c313b;
+            border-radius: 10px;
+            background: #11141a;
+            font: inherit;
+            color: #f3f4f6;
+        }
+
+        .button-row {
+            display: flex;
+            gap: 10px;
+            margin-top: 16px;
+        }
+
+        button {
+            padding: 10px 16px;
+            border: 1px solid #2c313b;
+            border-radius: 10px;
+            background: #11141a;
+            font: inherit;
+            color: #f3f4f6;
+            cursor: pointer;
+        }
+
+        button.primary {
+            background: #f3f4f6;
+            border-color: #f3f4f6;
+            color: #0f1115;
+        }
+
+        .helper {
+            margin: 10px 0 0;
+            font-size: 0.9rem;
+            color: #9ca3af;
+        }
+
+        .status {
+            display: inline-block;
+            padding: 6px 10px;
+            border-radius: 999px;
+            font-size: 0.82rem;
+            font-weight: 600;
+            background: #20252d;
+            color: #c4cad4;
+        }
+
+        .status.ok {
+            background: #edf7f0;
+            color: #1c6b37;
+        }
+
+        .status.error {
+            background: #fdeeee;
+            color: #9d2b2b;
+        }
+
+        .response-box {
+            min-height: 120px;
+        }
+
+        .response-empty,
+        .preview-empty,
+        .preview-error {
+            color: #9ca3af;
+            font-size: 0.95rem;
+        }
+
+        .preview-error {
+            color: #9d2b2b;
+        }
+
+        .table-wrap {
+            overflow-x: auto;
+        }
+
+        table {
+            width: 100%;
+            border-collapse: collapse;
+            font-size: 0.92rem;
+        }
+
+        th,
+        td {
+            padding: 10px 12px;
+            border-bottom: 1px solid #ececec;
+            text-align: left;
+            vertical-align: top;
+        }
+
+        th {
+            color: #e5e7eb;
+            font-weight: 600;
+            background: #11141a;
+        }
+
+        td {
+            color: #c4cad4;
+            word-break: break-word;
+        }
+
+        .detail-grid {
+            display: grid;
+            grid-template-columns: repeat(auto-fit, minmax(180px, 1fr));
+            gap: 12px;
+        }
+
+        .detail-card {
+            border: 1px solid #22262e;
+            border-radius: 10px;
+            padding: 12px;
+            background: #11141a;
+        }
+
+        .detail-card strong {
+            display: block;
+            margin-bottom: 6px;
+            font-size: 0.85rem;
+            color: #e5e7eb;
+        }
+
+        .detail-card span {
+            color: #c4cad4;
+            word-break: break-word;
+        }
+
+        @media (max-width: 920px) {
+            .layout {
+                grid-template-columns: 1fr;
+            }
+        }
     </style>
 </head>
 <body>
+<main class="shell">
+    <a class="back-link" th:href="@{/member/{name}(name=${member.key})}">&larr; Back</a>
 
-<a th:href="@{/}" class="back-link">&larr; Back to Team Roster</a>
+    <section class="header">
+        <h1 th:text="${entity.displayName}">Entity</h1>
+        <p th:text="${entity.description}">Description</p>
+    </section>
 
-<div class="header-container">
-    <h1 th:text="${pageTitle}">Entity Management</h1>
-</div>
+    <section class="layout">
+        <aside class="panel">
+            <h2>Endpoints</h2>
+            <div class="endpoint-list" id="endpointList">
+                <article class="endpoint-card" th:each="endpoint, iter : ${entity.endpoints}" th:attr="data-index=${iter.index}">
+                    <span class="endpoint-method" th:text="${endpoint.method}">GET</span>
+                    <p th:text="${endpoint.path}">/api/example</p>
+                </article>
+            </div>
+        </aside>
 
-<div th:if="${#lists.isEmpty(rows)}" class="empty-state">
-    No records found.
-</div>
+        <div class="content">
+            <section class="panel">
+                <h2>Request</h2>
+                <label>
+                    Endpoint
+                    <select id="endpointSelect"></select>
+                </label>
 
-<table th:unless="${#lists.isEmpty(rows)}">
-    <thead>
-    <tr>
-        <th th:each="column : ${columns}" th:text="${column}"></th>
-    </tr>
-    </thead>
-    <tbody>
-    <tr th:each="row : ${rows}">
-        <td th:each="column : ${columns}" th:text="${row[column]}"></td>
-    </tr>
-    </tbody>
-</table>
+                <div id="pathSection" class="field-section" hidden>
+                    <h3>Path Parameters</h3>
+                    <div id="pathFields" class="field-grid"></div>
+                </div>
 
+                <div id="querySection" class="field-section" hidden>
+                    <h3>Query Parameters</h3>
+                    <div id="queryFields" class="field-grid"></div>
+                </div>
+
+                <div id="bodySection" class="field-section" hidden>
+                    <h3>Body Fields</h3>
+                    <div id="bodyFields" class="field-grid"></div>
+                </div>
+
+                <p class="helper" id="endpointHelper"></p>
+
+                <div class="button-row">
+                    <button id="sendButton" class="primary" type="button">Send</button>
+                    <button id="resetButton" type="button">Reset</button>
+                </div>
+            </section>
+
+            <section class="panel">
+                <h2>Response</h2>
+                <span id="statusBadge" class="status">Waiting</span>
+                <div id="responseOutput" class="response-box" style="margin-top: 14px;">
+                    <div class="response-empty">No response yet.</div>
+                </div>
+            </section>
+
+            <section class="panel">
+                <h2>Preview</h2>
+                <div th:if="${previewError != null}" class="preview-error" th:text="${previewError}">Preview error</div>
+                <div th:if="${previewError == null and #lists.isEmpty(previewRows)}" class="preview-empty">No records found.</div>
+                <div th:if="${previewError == null and !#lists.isEmpty(previewRows)}" class="table-wrap">
+                    <table>
+                        <thead>
+                        <tr>
+                            <th th:each="column : ${previewColumns}" th:text="${column}">column</th>
+                        </tr>
+                        </thead>
+                        <tbody>
+                        <tr th:each="row : ${previewRows}">
+                            <td th:each="column : ${previewColumns}" th:text="${row[column]}">value</td>
+                        </tr>
+                        </tbody>
+                    </table>
+                </div>
+            </section>
+        </div>
+    </section>
+</main>
+
+<script th:inline="javascript">
+    const endpointConfigs = JSON.parse(/*[[${endpointConfigsJson}]]*/ "[]");
+    const endpointSelect = document.getElementById("endpointSelect");
+    const endpointCards = Array.from(document.querySelectorAll(".endpoint-card"));
+    const endpointHelper = document.getElementById("endpointHelper");
+    const responseOutput = document.getElementById("responseOutput");
+    const statusBadge = document.getElementById("statusBadge");
+
+    const pathSection = document.getElementById("pathSection");
+    const querySection = document.getElementById("querySection");
+    const bodySection = document.getElementById("bodySection");
+    const pathFields = document.getElementById("pathFields");
+    const queryFields = document.getElementById("queryFields");
+    const bodyFields = document.getElementById("bodyFields");
+
+    let selectedIndex = 0;
+
+    function createInput(field, prefix) {
+        const wrapper = document.createElement("label");
+        wrapper.textContent = field.label;
+
+        let input;
+        if (field.type === "boolean") {
+            input = document.createElement("select");
+            const emptyOption = new Option("Select", "");
+            const trueOption = new Option("true", "true");
+            const falseOption = new Option("false", "false");
+            input.add(emptyOption);
+            input.add(trueOption);
+            input.add(falseOption);
+        } else {
+            input = document.createElement("input");
+            input.type = field.type === "email" ? "email" : field.type === "number" || field.type === "decimal" ? "number" : "text";
+            if (field.type === "decimal") {
+                input.step = "0.01";
+            }
+        }
+
+        input.name = field.name;
+        input.dataset.type = field.type;
+        input.id = prefix + "-" + field.name;
+        input.placeholder = field.placeholder || "";
+        wrapper.appendChild(input);
+        return wrapper;
+    }
+
+    function renderFields(container, section, fields, prefix) {
+        container.innerHTML = "";
+        section.hidden = !fields.length;
+        fields.forEach((field) => container.appendChild(createInput(field, prefix)));
+    }
+
+    function applyEndpoint(index) {
+        selectedIndex = index;
+        const endpoint = endpointConfigs[index];
+        if (!endpoint) {
+            return;
+        }
+
+        endpointSelect.value = String(index);
+        endpointCards.forEach((card, cardIndex) => card.classList.toggle("active", cardIndex === index));
+
+        renderFields(pathFields, pathSection, endpoint.pathFields || [], "path");
+        renderFields(queryFields, querySection, endpoint.queryFields || [], "query");
+        renderFields(bodyFields, bodySection, endpoint.bodyFields || [], "body");
+
+        endpointHelper.textContent = endpoint.displayLine || endpoint.path;
+    }
+
+    function getFieldValues(container) {
+        const values = {};
+        container.querySelectorAll("input, select").forEach((input) => {
+            values[input.name] = input.value.trim();
+        });
+        return values;
+    }
+
+    function convertValue(value, type) {
+        if (value === "") {
+            return null;
+        }
+        if (type === "number") {
+            return Number(value);
+        }
+        if (type === "decimal") {
+            return Number(value);
+        }
+        if (type === "boolean") {
+            return value === "true";
+        }
+        if (type === "list") {
+            return value.split(",").map((item) => item.trim()).filter(Boolean);
+        }
+        return value;
+    }
+
+    function buildPath(endpoint) {
+        let path = endpoint.path.split("?")[0];
+        const values = getFieldValues(pathFields);
+        (endpoint.pathFields || []).forEach((field) => {
+            path = path.replace("{" + field.name + "}", encodeURIComponent(values[field.name] || ""));
+        });
+        return path;
+    }
+
+    function buildQuery(endpoint) {
+        const values = getFieldValues(queryFields);
+        const params = new URLSearchParams();
+        (endpoint.queryFields || []).forEach((field) => {
+            const value = values[field.name];
+            if (value !== "") {
+                params.append(field.name, value);
+            }
+        });
+        const query = params.toString();
+        return query ? "?" + query : "";
+    }
+
+    function buildBody(endpoint) {
+        if (!endpoint.bodyFields || !endpoint.bodyFields.length) {
+            return "";
+        }
+
+        const body = {};
+        const isPatch = endpoint.method === "PATCH";
+        bodyFields.querySelectorAll("input, select").forEach((input) => {
+            const value = convertValue(input.value.trim(), input.dataset.type);
+            if (isPatch && (value === null || value === "" || (Array.isArray(value) && !value.length))) {
+                return;
+            }
+            body[input.name] = value;
+        });
+
+        return Object.keys(body).length ? JSON.stringify(body) : "";
+    }
+
+    function setStatus(text, cssClass) {
+        statusBadge.textContent = text;
+        statusBadge.className = "status" + (cssClass ? " " + cssClass : "");
+    }
+
+    function escapeHtml(value) {
+        return String(value)
+            .replaceAll("&", "&amp;")
+            .replaceAll("<", "&lt;")
+            .replaceAll(">", "&gt;");
+    }
+
+    function formatValue(value) {
+        if (value === null || value === undefined || value === "") {
+            return "-";
+        }
+        if (Array.isArray(value)) {
+            return value.join(", ");
+        }
+        if (typeof value === "object") {
+            return JSON.stringify(value);
+        }
+        return String(value);
+    }
+
+    function renderObject(data) {
+        const entries = Object.entries(data || {});
+        if (!entries.length) {
+            responseOutput.innerHTML = '<div class="response-empty">No data returned.</div>';
+            return;
+        }
+
+        responseOutput.innerHTML = `
+            <div class="detail-grid">
+                ${entries.map(([key, value]) => `
+                    <div class="detail-card">
+                        <strong>${escapeHtml(key)}</strong>
+                        <span>${escapeHtml(formatValue(value))}</span>
+                    </div>
+                `).join("")}
+            </div>
+        `;
+    }
+
+    function renderArray(data) {
+        if (!data.length) {
+            responseOutput.innerHTML = '<div class="response-empty">No records found.</div>';
+            return;
+        }
+
+        if (typeof data[0] !== "object" || data[0] === null || Array.isArray(data[0])) {
+            responseOutput.innerHTML = `
+                <div class="detail-grid">
+                    ${data.map((item) => `
+                        <div class="detail-card"><span>${escapeHtml(formatValue(item))}</span></div>
+                    `).join("")}
+                </div>
+            `;
+            return;
+        }
+
+        const columns = Array.from(data.reduce((set, item) => {
+            Object.keys(item || {}).forEach((key) => set.add(key));
+            return set;
+        }, new Set()));
+
+        responseOutput.innerHTML = `
+            <div class="table-wrap">
+                <table>
+                    <thead>
+                        <tr>${columns.map((column) => `<th>${escapeHtml(column)}</th>`).join("")}</tr>
+                    </thead>
+                    <tbody>
+                        ${data.map((row) => `
+                            <tr>
+                                ${columns.map((column) => `<td>${escapeHtml(formatValue(row[column]))}</td>`).join("")}
+                            </tr>
+                        `).join("")}
+                    </tbody>
+                </table>
+            </div>
+        `;
+    }
+
+    function renderResponseBody(body) {
+        if (!body) {
+            responseOutput.innerHTML = '<div class="response-empty">Request completed.</div>';
+            return;
+        }
+
+        try {
+            const parsed = JSON.parse(body);
+            if (Array.isArray(parsed)) {
+                renderArray(parsed);
+                return;
+            }
+            if (typeof parsed === "object" && parsed !== null) {
+                renderObject(parsed);
+                return;
+            }
+            responseOutput.innerHTML = `<div class="detail-card"><span>${escapeHtml(String(parsed))}</span></div>`;
+        } catch (error) {
+            responseOutput.innerHTML = `<div class="detail-card"><span>${escapeHtml(body)}</span></div>`;
+        }
+    }
+
+    endpointConfigs.forEach((endpoint, index) => {
+        const option = new Option(endpoint.method + " " + endpoint.path, String(index));
+        endpointSelect.add(option);
+    });
+
+    endpointCards.forEach((card, index) => {
+        card.addEventListener("click", () => applyEndpoint(index));
+    });
+
+    endpointSelect.addEventListener("change", (event) => {
+        applyEndpoint(Number(event.target.value));
+    });
+
+    document.getElementById("resetButton").addEventListener("click", () => applyEndpoint(selectedIndex));
+
+    document.getElementById("sendButton").addEventListener("click", async () => {
+        const endpoint = endpointConfigs[selectedIndex];
+        const payload = {
+            method: endpoint.method,
+            path: buildPath(endpoint) + buildQuery(endpoint),
+            body: buildBody(endpoint)
+        };
+
+        setStatus("Loading", "");
+        responseOutput.innerHTML = '<div class="response-empty">Loading...</div>';
+
+        try {
+            const response = await fetch("/ui/api-explorer/execute", {
+                method: "POST",
+                headers: { "Content-Type": "application/json" },
+                body: JSON.stringify(payload)
+            });
+
+            const result = await response.json();
+            if (result.error) {
+                setStatus("HTTP " + result.status, "error");
+                responseOutput.innerHTML = `<div class="preview-error">${escapeHtml(result.error)}</div>`;
+                return;
+            }
+
+            setStatus("HTTP " + result.status, result.status >= 200 && result.status < 300 ? "ok" : "error");
+            renderResponseBody(result.body);
+        } catch (error) {
+            setStatus("Error", "error");
+            responseOutput.innerHTML = `<div class="preview-error">${escapeHtml(error.message)}</div>`;
+        }
+    });
+
+    applyEndpoint(0);
+</script>
 </body>
 </html>
