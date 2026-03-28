@@ -1,0 +1,117 @@
+<!DOCTYPE html>
+<html xmlns:th="http://www.thymeleaf.org">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title th:text="${member.name + ' - Film Rental Store'}">Member</title>
+    <style>
+        body {
+            margin: 0;
+            font-family: "Segoe UI", Tahoma, sans-serif;
+            background: #0f1115;
+            color: #f3f4f6;
+        }
+
+        .shell {
+            max-width: 960px;
+            margin: 0 auto;
+            padding: 28px 18px 36px;
+        }
+
+        .back-link {
+            color: #b6bcc8;
+            text-decoration: none;
+            font-size: 0.95rem;
+        }
+
+        .header {
+            margin: 18px 0 22px;
+        }
+
+        .header h1 {
+            margin: 0 0 8px;
+            font-size: 2rem;
+            font-weight: 600;
+        }
+
+        .header p {
+            margin: 0;
+            color: #9ca3af;
+        }
+
+        .entity-grid {
+            display: grid;
+            gap: 14px;
+        }
+
+        .entity-card {
+            padding: 18px;
+            border: 1px solid #22262e;
+            border-radius: 14px;
+            background: #171a21;
+        }
+
+        .entity-card h2 {
+            margin: 0 0 8px;
+            font-size: 1.1rem;
+            font-weight: 600;
+        }
+
+        .entity-card p {
+            margin: 0 0 14px;
+            color: #a3aab7;
+            line-height: 1.5;
+        }
+
+        .tag-row {
+            display: flex;
+            flex-wrap: wrap;
+            gap: 8px;
+            margin-bottom: 14px;
+        }
+
+        .tag {
+            padding: 6px 10px;
+            border-radius: 999px;
+            background: #20252d;
+            color: #c4cad4;
+            font-size: 0.82rem;
+        }
+
+        .action {
+            display: inline-flex;
+            padding: 10px 14px;
+            border-radius: 10px;
+            text-decoration: none;
+            color: #fff;
+            font-weight: 500;
+        }
+    </style>
+</head>
+<body>
+<main class="shell">
+    <a class="back-link" th:href="@{/}">&larr; Back</a>
+
+    <section class="header">
+        <h1 th:text="${member.name}">Member Name</h1>
+        <p th:text="${member.role}">Role</p>
+    </section>
+
+    <section class="entity-grid">
+        <article class="entity-card" th:each="entity : ${entities}">
+            <h2 th:text="${entity.displayName}">Entity</h2>
+            <p th:text="${entity.description}">Entity description</p>
+            <div class="tag-row">
+                <span class="tag" th:text="${entity.collectionPath}">/api/example</span>
+                <span class="tag" th:text="${#lists.size(entity.endpoints) + ' endpoints'}">0 endpoints</span>
+            </div>
+            <a class="action"
+               th:style="'background:' + ${member.accent} + ';'"
+               th:href="@{/entities/{entityKey}(entityKey=${entity.key})}">
+                Open
+            </a>
+        </article>
+    </section>
+</main>
+</body>
+</html>
