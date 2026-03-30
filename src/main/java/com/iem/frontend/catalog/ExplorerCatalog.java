@@ -48,7 +48,7 @@ public final class ExplorerCatalog {
         members.put("anwesha", new MemberDefinition(
                 "anwesha",
                 "Anwesha Ghosh",
-                "/images/anwesha.svg",
+                "/images/anwesha.jpeg",
                 "Films and categories",
                 "#a64b2a",
                 "Owns the catalog-facing resources for films and category organization.",
@@ -58,17 +58,17 @@ public final class ExplorerCatalog {
         members.put("harshita", new MemberDefinition(
                 "harshita",
                 "Harshita Dujari",
-                "/images/harshita.svg",
-                "Actors and languages",
+                "/images/harshita.jpeg",
+                "Actors, film relationships, and languages",
                 "#0e5f76",
-                "Maintains performer and language records used throughout the catalog.",
-                List.of("actors", "languages")
+                "Maintains performer, language, and film-actor relationship records used throughout the catalog.",
+                List.of("actors", "film-actor", "languages")
         ));
 
         members.put("mafuj", new MemberDefinition(
                 "mafuj",
                 "Mafuj Gazi",
-                "/images/mafuj.svg",
+                "/images/mafuj.jpeg",
                 "Customers and location data",
                 "#0b6e4f",
                 "Handles customer records together with the address, city, and country reference data they depend on.",
@@ -78,7 +78,7 @@ public final class ExplorerCatalog {
         members.put("shreyash", new MemberDefinition(
                 "shreyash",
                 "Shreyash Singh",
-                "/images/shreyash.svg",
+                "/images/shreyash.jpeg",
                 "Stores and inventory",
                 "#7a3e00",
                 "Owns store operations and inventory availability across locations.",
@@ -88,7 +88,7 @@ public final class ExplorerCatalog {
         members.put("utsav", new MemberDefinition(
                 "utsav",
                 "Utsav Sarda",
-                "/images/utsav.jpg",
+                "/images/utsav.JPG",
                 "Staff, payments, and rentals",
                 "#7a1f3d",
                 "Maintains operational workflows for staff activity, payments, and rental lifecycle endpoints.",
@@ -115,6 +115,20 @@ public final class ExplorerCatalog {
                         endpoint("Get actor by id", "GET", "/api/actors/{id}", "Replace {id} with an actor id.", null, "ActorDTO", "GET /api/actors/{id} -> ActorDTO"),
                         endpoint("Search actors by name", "GET", "/api/actors/search?name=", "Provide a full or partial name.", null, "ActorDTO[]", "GET /api/actors/search?name=... -> ActorDTO[]"),
                         endpoint("Replace actor", "PUT", "/api/actors/{id}", "Replace {id} with an actor id.", "ActorRequestDTO", "ActorDTO", "PUT /api/actors/{id} body: ActorRequestDTO -> ActorDTO")
+                )
+        ));
+
+        entities.put("film-actor", entity(
+                "film-actor",
+                "FilmActor",
+                "harshita",
+                "Explore film-to-actor relationship endpoints from either actor name or film title.",
+                "FilmActorQueryDTO",
+                List.of("name", "title"),
+                "/api/film-actor/films-by-actor?name=PENELOPE",
+                List.of(
+                        endpoint("Get films by actor", "GET", "/api/film-actor/films-by-actor?name=", "Provide an actor name.", null, "FilmResponseDTO[]", "GET /api/film-actor/films-by-actor?name=... -> FilmResponseDTO[]"),
+                        endpoint("Get actors by film", "GET", "/api/film-actor/actors-by-film?title=", "Provide a film title.", null, "ActorResponseDTO[]", "GET /api/film-actor/actors-by-film?title=... -> ActorResponseDTO[]")
                 )
         ));
 
@@ -180,7 +194,7 @@ public final class ExplorerCatalog {
                 "mafuj",
                 "Maintain country reference data and country search.",
                 "CountryRequestDTO",
-                List.of("name"),
+                List.of("country"),
                 "/api/countries",
                 List.of(
                         endpoint("Create country", "POST", "/api/countries", null, "CountryRequestDTO", "CountryDTO", "POST /api/countries body: CountryRequestDTO -> CountryDTO"),

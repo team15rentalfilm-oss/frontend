@@ -151,6 +151,11 @@
             cursor: pointer;
         }
 
+        button:disabled {
+            opacity: 0.45;
+            cursor: not-allowed;
+        }
+
         button.primary {
             background: #f3f4f6;
             border-color: #f3f4f6;
@@ -223,6 +228,30 @@
             background: #20252d;
             color: #d1d5db;
             font-size: 0.85rem;
+        }
+
+        .pagination-row {
+            display: flex;
+            flex-wrap: wrap;
+            align-items: center;
+            gap: 10px;
+        }
+
+        .pager {
+            display: inline-flex;
+            align-items: center;
+            justify-content: center;
+            padding: 10px 16px;
+            border: 1px solid #2c313b;
+            border-radius: 10px;
+            background: #11141a;
+            color: #f3f4f6;
+            text-decoration: none;
+        }
+
+        .pager.disabled {
+            opacity: 0.45;
+            pointer-events: none;
         }
 
         .message-card {
@@ -331,6 +360,36 @@
             word-break: break-word;
         }
 
+        .record-grid {
+            display: grid;
+            gap: 14px;
+        }
+
+        .record-card {
+            border: 1px solid #22262e;
+            border-radius: 12px;
+            padding: 14px;
+            background: #11141a;
+        }
+
+        .record-header {
+            display: grid;
+            gap: 10px;
+            margin-bottom: 12px;
+        }
+
+        .record-title {
+            display: block;
+            font-size: 1rem;
+            color: #f3f4f6;
+        }
+
+        .record-meta {
+            display: flex;
+            flex-wrap: wrap;
+            gap: 8px;
+        }
+
         @media (max-width: 920px) {
             .layout {
                 grid-template-columns: 1fr;
@@ -415,6 +474,12 @@
                 <h2>Preview</h2>
                 <div th:if="${previewError != null}" class="preview-error" th:text="${previewError}">Preview error</div>
                 <div th:if="${previewError == null and #lists.isEmpty(previewRows)}" class="preview-empty">No records found.</div>
+                <div th:if="${previewError == null and previewHasPagination}" class="pagination-row" style="margin-bottom: 14px;">
+                    <a th:classappend="${!previewHasPrevious} ? ' disabled'" class="pager" th:href="${previewPreviousUrl}">Previous page</a>
+                    <span class="response-pill" th:text="${'Page ' + previewPageNumber + ' of ' + previewTotalPages}">Page 1 of 1</span>
+                    <span class="response-pill" th:text="${'Total records ' + previewTotalElements}">Total records 0</span>
+                    <a th:classappend="${!previewHasNext} ? ' disabled'" class="pager" th:href="${previewNextUrl}">Next page</a>
+                </div>
                 <div th:if="${previewError == null and !#lists.isEmpty(previewRows)}" class="table-wrap">
                     <table>
                         <thead>
@@ -450,9 +515,19 @@
     const bodyFields = document.getElementById("bodyFields");
 
     let selectedIndex = 0;
+    let lastRequestPayload = null;
+    let responsePagination = null;
 
     function isManagedQueryField(fieldName) {
         return fieldName === "page" || fieldName === "size" || fieldName === "sort";
+    }
+
+    function isPagedEndpoint(endpoint) {
+        return (endpoint.queryFields || []).some((field) => field.name === "page" || field.name === "size");
+    }
+
+    function defaultPageSize(endpoint) {
+        return endpoint.path.includes("/api/films") ? 12 : 12;
     }
 
     function createInput(field, prefix) {
@@ -507,9 +582,9 @@
         renderFields(queryFields, querySection, endpoint.queryFields || [], "query");
         renderFields(bodyFields, bodySection, endpoint.bodyFields || [], "body");
 
-        const hasAutomaticPaging = (endpoint.queryFields || []).some((field) => field.name === "page" || field.name === "size");
+        const hasAutomaticPaging = isPagedEndpoint(endpoint);
         endpointHelper.textContent = hasAutomaticPaging
-            ? (endpoint.displayLine || endpoint.path) + " | The first 100 records are loaded automatically."
+            ? (endpoint.displayLine || endpoint.path) + " | " + defaultPageSize(endpoint) + " records are loaded per page."
             : (endpoint.displayLine || endpoint.path);
     }
 
@@ -549,16 +624,16 @@
         return path;
     }
 
-    function buildQuery(endpoint) {
+    function buildQuery(endpoint, pageOverride = 0) {
         const values = getFieldValues(queryFields);
         const params = new URLSearchParams();
         (endpoint.queryFields || []).forEach((field) => {
             if (field.name === "page") {
-                params.append("page", "0");
+                params.append("page", String(pageOverride));
                 return;
             }
             if (field.name === "size") {
-                params.append("size", "100");
+                params.append("size", String(defaultPageSize(endpoint)));
                 return;
             }
             if (field.name === "sort") {
@@ -632,6 +707,159 @@
         } catch (error) {
             return value;
         }
+    }
+
+    function isObjectLike(value) {
+        return value && typeof value === "object" && !Array.isArray(value);
+    }
+
+    function hasNestedValue(value) {
+        const parsed = safeParseJson(value);
+        return Array.isArray(parsed) || isObjectLike(parsed);
+    }
+
+    function collectColumns(data) {
+        return Array.from(data.reduce((set, item) => {
+            Object.keys(item || {}).forEach((key) => set.add(key));
+            return set;
+        }, new Set()));
+    }
+
+    function shouldRenderAsCards(data) {
+        const columns = collectColumns(data);
+        return columns.length > 6 || data.some((row) => Object.values(row || {}).some((value) => hasNestedValue(value)));
+    }
+
+    function pickCardTitle(row) {
+        if (row.title) {
+            return formatValue(row.title);
+        }
+        if (row.name) {
+            return formatValue(row.name);
+        }
+        if (row.firstName || row.lastName) {
+            return [row.firstName, row.lastName].filter(Boolean).map((value) => formatValue(value)).join(" ");
+        }
+        if (row.country) {
+            return formatValue(row.country);
+        }
+        if (row.city) {
+            return formatValue(row.city);
+        }
+        const identifier = Object.entries(row || {}).find(([key, value]) => /id$/i.test(key) && value !== null && value !== undefined && value !== "");
+        return identifier ? `${normalizeLabel(identifier[0])} ${formatValue(identifier[1])}` : "Record";
+    }
+
+    function pickCardMeta(row) {
+        const candidates = [
+            "filmId",
+            "actorId",
+            "countryId",
+            "cityId",
+            "categoryId",
+            "customerId",
+            "inventoryId",
+            "paymentId",
+            "rentalId",
+            "staffId",
+            "storeId",
+            "releaseYear",
+            "rating",
+            "active"
+        ];
+
+        return candidates
+            .filter((key) => row[key] !== null && row[key] !== undefined && row[key] !== "" && !hasNestedValue(row[key]))
+            .slice(0, 4)
+            .map((key) => ({ key, label: normalizeLabel(key), value: formatValue(row[key]) }));
+    }
+
+    function renderRecordCards(data, depth = 0) {
+        const summaryItems = depth === 0 ? [`Showing ${data.length} record${data.length === 1 ? "" : "s"}`] : [];
+
+        return `
+            <div class="response-stack">
+                ${renderSummary(summaryItems)}
+                <div class="record-grid">
+                    ${data.map((row) => {
+                        const title = pickCardTitle(row || {});
+                        const meta = pickCardMeta(row || {});
+                        const metaKeys = new Set(meta.map((item) => item.key));
+                        const detailEntries = Object.entries(row || {}).filter(([key]) => {
+                            if (row.title && key === "title") {
+                                return false;
+                            }
+                            if (row.name && key === "name") {
+                                return false;
+                            }
+                            if ((row.firstName || row.lastName) && (key === "firstName" || key === "lastName")) {
+                                return false;
+                            }
+                            if (row.country && key === "country") {
+                                return false;
+                            }
+                            if (row.city && key === "city") {
+                                return false;
+                            }
+                            return !metaKeys.has(key);
+                        });
+
+                        return `
+                            <article class="record-card">
+                                <div class="record-header">
+                                    <strong class="record-title">${escapeHtml(title)}</strong>
+                                    ${meta.length ? `<div class="record-meta">${meta.map((item) => `<span class="response-pill">${escapeHtml(item.label + ": " + item.value)}</span>`).join("")}</div>` : ""}
+                                </div>
+                                ${detailEntries.length ? `
+                                    <div class="detail-grid">
+                                        ${detailEntries.map(([key, value]) => `
+                                            <div class="detail-card">
+                                                <strong>${escapeHtml(normalizeLabel(key))}</strong>
+                                                ${renderValue(value, depth + 1)}
+                                            </div>
+                                        `).join("")}
+                                    </div>
+                                ` : ""}
+                            </article>
+                        `;
+                    }).join("")}
+                </div>
+            </div>
+        `;
+    }
+
+    function extractPagination(data) {
+        return {
+            page: Number.isFinite(data.number) ? data.number : 0,
+            totalPages: Math.max(Number.isFinite(data.totalPages) ? data.totalPages : 1, 1),
+            totalElements: Number.isFinite(data.totalElements) ? data.totalElements : data.content.length,
+            size: Number.isFinite(data.size) ? data.size : defaultPageSize(endpointConfigs[selectedIndex])
+        };
+    }
+
+    function renderPaginationControls(pagination) {
+        if (!pagination || pagination.totalPages <= 1) {
+            return "";
+        }
+
+        return `
+            <div class="pagination-row">
+                <button type="button" data-page-target="${pagination.page - 1}" ${pagination.page <= 0 ? "disabled" : ""}>Previous page</button>
+                <span class="response-pill">Page ${pagination.page + 1} of ${pagination.totalPages}</span>
+                <span class="response-pill">Total records ${pagination.totalElements}</span>
+                <button type="button" data-page-target="${pagination.page + 1}" ${pagination.page + 1 >= pagination.totalPages ? "disabled" : ""}>Next page</button>
+            </div>
+        `;
+    }
+
+    function updatePageInPath(path, nextPage) {
+        const [basePath, queryString = ""] = path.split("?");
+        const params = new URLSearchParams(queryString);
+        params.set("page", String(Math.max(nextPage, 0)));
+        if (!params.has("size")) {
+            params.set("size", String(responsePagination?.size || defaultPageSize(endpointConfigs[selectedIndex])));
+        }
+        return `${basePath}?${params.toString()}`;
     }
 
     function getFriendlyError(parsed) {
@@ -766,6 +994,8 @@
         }
 
         if (isPagedResult(data)) {
+            const pagination = extractPagination(data);
+            responsePagination = pagination;
             const summaryItems = [
                 data.number !== undefined ? `Page ${data.number + 1}` : null,
                 data.size !== undefined ? `Showing up to ${data.size} records` : null,
@@ -776,7 +1006,9 @@
             return `
                 <div class="response-stack">
                     ${renderSummary(summaryItems)}
+                    ${renderPaginationControls(pagination)}
                     ${renderArray(data.content || [], depth + 1)}
+                    ${renderPaginationControls(pagination)}
                 </div>
             `;
         }
@@ -813,10 +1045,11 @@
             `;
         }
 
-        const columns = Array.from(data.reduce((set, item) => {
-            Object.keys(item || {}).forEach((key) => set.add(key));
-            return set;
-        }, new Set()));
+        if (shouldRenderAsCards(data)) {
+            return renderRecordCards(data, depth);
+        }
+
+        const columns = collectColumns(data);
 
         const summaryItems = depth === 0 ? [`Showing ${data.length} record${data.length === 1 ? "" : "s"}`] : [];
         return `
@@ -852,6 +1085,7 @@
     }
 
     function renderResponseBody(body, status) {
+        responsePagination = null;
         if (!body) {
             responseOutput.innerHTML = '<div class="response-empty">Request completed.</div>';
             return;
@@ -884,30 +1118,10 @@
         }
     }
 
-    endpointConfigs.forEach((endpoint, index) => {
-        const option = new Option(endpoint.method + " " + endpoint.path, String(index));
-        endpointSelect.add(option);
-    });
-
-    endpointCards.forEach((card, index) => {
-        card.addEventListener("click", () => applyEndpoint(index));
-    });
-
-    endpointSelect.addEventListener("change", (event) => {
-        applyEndpoint(Number(event.target.value));
-    });
-
-    document.getElementById("resetButton").addEventListener("click", () => applyEndpoint(selectedIndex));
-
-    document.getElementById("sendButton").addEventListener("click", async () => {
-        const endpoint = endpointConfigs[selectedIndex];
-        const payload = {
-            method: endpoint.method,
-            path: buildPath(endpoint) + buildQuery(endpoint),
-            body: buildBody(endpoint)
-        };
-
+    async function executePayload(payload) {
+        lastRequestPayload = payload;
         setStatus("Loading", "");
+        responsePagination = null;
         responseOutput.innerHTML = '<div class="response-empty">Loading...</div>';
 
         try {
@@ -936,6 +1150,44 @@
                 error.message || "The backend may be unavailable right now."
             );
         }
+    }
+
+    endpointConfigs.forEach((endpoint, index) => {
+        const option = new Option(endpoint.method + " " + endpoint.path, String(index));
+        endpointSelect.add(option);
+    });
+
+    endpointCards.forEach((card, index) => {
+        card.addEventListener("click", () => applyEndpoint(index));
+    });
+
+    endpointSelect.addEventListener("change", (event) => {
+        applyEndpoint(Number(event.target.value));
+    });
+
+    document.getElementById("resetButton").addEventListener("click", () => applyEndpoint(selectedIndex));
+
+    responseOutput.addEventListener("click", (event) => {
+        const trigger = event.target.closest("[data-page-target]");
+        if (!trigger || trigger.disabled || !lastRequestPayload) {
+            return;
+        }
+
+        const nextPage = Number(trigger.dataset.pageTarget);
+        executePayload({
+            ...lastRequestPayload,
+            path: updatePageInPath(lastRequestPayload.path, nextPage)
+        });
+    });
+
+    document.getElementById("sendButton").addEventListener("click", async () => {
+        const endpoint = endpointConfigs[selectedIndex];
+        const payload = {
+            method: endpoint.method,
+            path: buildPath(endpoint) + buildQuery(endpoint),
+            body: buildBody(endpoint)
+        };
+        executePayload(payload);
     });
 
     applyEndpoint(0);
