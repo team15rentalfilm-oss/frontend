@@ -63,9 +63,36 @@
         }
 
         .member-role {
-            margin: 0;
+            margin: 0 0 8px;
             color: #a3aab7;
             line-height: 1.5;
+        }
+
+        .member-intro {
+            margin: 0 0 10px;
+            color: #d1d5db;
+            line-height: 1.5;
+        }
+
+        .tag-row {
+            display: flex;
+            flex-wrap: wrap;
+            gap: 8px;
+        }
+
+        .tag {
+            padding: 6px 10px;
+            border-radius: 999px;
+            background: #20252d;
+            color: #c4cad4;
+            font-size: 0.82rem;
+        }
+
+        @media (max-width: 640px) {
+            .member-card {
+                align-items: flex-start;
+                flex-direction: column;
+            }
         }
     </style>
 </head>
@@ -79,6 +106,11 @@
             <div class="member-info">
                 <h2 th:text="${member.name}">Member Name</h2>
                 <p class="member-role" th:text="${member.role}">Role</p>
+                <p class="member-intro" th:text="${member.intro}">Member intro</p>
+                <div class="tag-row">
+                    <span class="tag" th:text="${#lists.size(member.entityKeys) + ' resources'}">0 resources</span>
+                    <span class="tag" th:text="${baseUrl}">http://localhost:8081</span>
+                </div>
             </div>
         </a>
     </section>

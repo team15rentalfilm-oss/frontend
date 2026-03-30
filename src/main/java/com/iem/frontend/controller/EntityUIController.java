@@ -75,9 +75,14 @@ public class EntityUIController {
 
     @GetMapping({
             "/actors",
+            "/addresses",
             "/categories",
+            "/cities",
+            "/countries",
             "/customers",
             "/films",
+            "/inventory",
+            "/inventories",
             "/languages",
             "/payments",
             "/rentals",
@@ -85,18 +90,6 @@ public class EntityUIController {
             "/stores"
     })
     public String legacyPluralRoute(HttpServletRequest request) {
-        return redirectLegacyPath(request);
-    }
-
-    @GetMapping({
-            "/film-actor",
-            "/film-actors",
-            "/film-text",
-            "/film-texts",
-            "/inventory",
-            "/inventories"
-    })
-    public String legacyMixedRoute(HttpServletRequest request) {
         return redirectLegacyPath(request);
     }
 
@@ -143,17 +136,18 @@ public class EntityUIController {
     private String redirectLegacyPath(HttpServletRequest request) {
         String entityKey = switch (request.getRequestURI()) {
             case "/actors" -> "actors";
+            case "/addresses" -> "addresses";
             case "/categories" -> "categories";
+            case "/cities" -> "cities";
+            case "/countries" -> "countries";
             case "/customers" -> "customers";
             case "/films" -> "films";
+            case "/inventory", "/inventories" -> "inventory";
             case "/languages" -> "languages";
             case "/payments" -> "payments";
             case "/rentals" -> "rentals";
             case "/staff" -> "staff";
             case "/stores" -> "stores";
-            case "/film-actor", "/film-actors" -> "filmActor";
-            case "/film-text", "/film-texts" -> "filmTexts";
-            case "/inventory", "/inventories" -> "inventories";
             default -> null;
         };
 
@@ -204,6 +198,10 @@ public class EntityUIController {
             JsonNode root = objectMapper.readTree(response.body());
             if (root == null || root.isNull()) {
                 return new PreviewData(List.of(), List.of(), "Preview returned no data.");
+            }
+
+            if (root.isObject() && root.has("content") && root.get("content").isArray()) {
+                root = root.get("content");
             }
 
             List<Map<String, Object>> rows = new ArrayList<>();
@@ -291,20 +289,7 @@ public class EntityUIController {
     }
 
     private List<FieldConfig> buildQueryFields(EntityDefinition entity, EndpointDefinition endpoint) {
-        String overrideKey = entity.key() + ":" + endpoint.method() + ":" + endpoint.path();
-        return switch (overrideKey) {
-            case "payments:GET:/api/payments?customerId=" -> List.of(
-                    fieldConfig("customerId", "number", true),
-                    fieldConfig("staffId", "number", true),
-                    fieldConfig("rentalId", "number", true)
-            );
-            case "rentals:GET:/api/rentals?customerId=" -> List.of(
-                    fieldConfig("customerId", "number", true),
-                    fieldConfig("inventoryId", "number", true),
-                    fieldConfig("staffId", "number", true)
-            );
-            default -> buildQueryFieldsFromPath(endpoint.path());
-        };
+        return buildQueryFieldsFromPath(endpoint.path());
     }
 
     private List<FieldConfig> buildQueryFieldsFromPath(String path) {
@@ -327,10 +312,12 @@ public class EntityUIController {
         }
 
         List<String> fields = switch (entity.key() + ":" + endpoint.method()) {
-            case "inventories:PATCH" -> List.of("filmId", "storeId");
-            case "filmTexts:PATCH" -> List.of("title", "description");
-            default -> endpoint.bodySchema().toLowerCase(Locale.ROOT).contains("partial")
-                    ? entity.schemaFields().stream().filter(field -> !field.equals("id") && !field.endsWith("Id")).toList()
+            case "inventory:PATCH" -> List.of("filmId", "storeId");
+            default -> endpoint.method().equals("PATCH")
+                    || endpoint.bodySchema().toLowerCase(Locale.ROOT).contains("patch")
+                    ? entity.schemaFields().stream()
+                    .filter(field -> !field.equals("id") && !field.equals("createDate") && !field.equals("lastUpdate"))
+                    .toList()
                     : entity.schemaFields();
         };
 

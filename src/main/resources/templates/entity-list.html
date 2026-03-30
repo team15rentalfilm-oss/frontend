@@ -136,6 +136,7 @@
 
         .button-row {
             display: flex;
+            flex-wrap: wrap;
             gap: 10px;
             margin-top: 16px;
         }
@@ -197,6 +198,85 @@
             color: #9d2b2b;
         }
 
+        .response-stack {
+            display: grid;
+            gap: 14px;
+        }
+
+        .response-note,
+        .response-summary {
+            padding: 12px;
+            border-radius: 10px;
+            border: 1px solid #22262e;
+            background: #11141a;
+        }
+
+        .response-summary {
+            display: flex;
+            flex-wrap: wrap;
+            gap: 10px;
+        }
+
+        .response-pill {
+            padding: 6px 10px;
+            border-radius: 999px;
+            background: #20252d;
+            color: #d1d5db;
+            font-size: 0.85rem;
+        }
+
+        .message-card {
+            padding: 14px;
+            border-radius: 10px;
+            border: 1px solid #22262e;
+            background: #11141a;
+        }
+
+        .message-card strong {
+            display: block;
+            margin-bottom: 6px;
+            color: #f3f4f6;
+        }
+
+        .message-card p {
+            margin: 0;
+            color: #c4cad4;
+            line-height: 1.5;
+        }
+
+        .nested-list {
+            display: grid;
+            gap: 10px;
+        }
+
+        .nested-item {
+            padding: 10px 12px;
+            border-radius: 10px;
+            border: 1px solid #22262e;
+            background: #11141a;
+        }
+
+        .nested-item strong {
+            display: block;
+            margin-bottom: 6px;
+            color: #e5e7eb;
+            font-size: 0.86rem;
+        }
+
+        .chip-list {
+            display: flex;
+            flex-wrap: wrap;
+            gap: 8px;
+        }
+
+        .chip {
+            padding: 6px 10px;
+            border-radius: 999px;
+            background: #20252d;
+            color: #d1d5db;
+            font-size: 0.85rem;
+        }
+
         .table-wrap {
             overflow-x: auto;
         }
@@ -256,6 +336,16 @@
                 grid-template-columns: 1fr;
             }
         }
+
+        @media (max-width: 640px) {
+            .button-row {
+                flex-direction: column;
+            }
+
+            .response-summary {
+                flex-direction: column;
+            }
+        }
     </style>
 </head>
 <body>
@@ -265,6 +355,10 @@
     <section class="header">
         <h1 th:text="${entity.displayName}">Entity</h1>
         <p th:text="${entity.description}">Description</p>
+        <p class="helper" th:if="${!#lists.isEmpty(entity.allowedSortFields)}"
+           th:text="${'Allowed sort fields: ' + entity.allowedSortFields}">
+            Allowed sort fields
+        </p>
     </section>
 
     <section class="layout">
@@ -357,6 +451,10 @@
 
     let selectedIndex = 0;
 
+    function isManagedQueryField(fieldName) {
+        return fieldName === "page" || fieldName === "size" || fieldName === "sort";
+    }
+
     function createInput(field, prefix) {
         const wrapper = document.createElement("label");
         wrapper.textContent = field.label;
@@ -388,8 +486,11 @@
 
     function renderFields(container, section, fields, prefix) {
         container.innerHTML = "";
-        section.hidden = !fields.length;
-        fields.forEach((field) => container.appendChild(createInput(field, prefix)));
+        const visibleFields = prefix === "query"
+            ? fields.filter((field) => !isManagedQueryField(field.name))
+            : fields;
+        section.hidden = !visibleFields.length;
+        visibleFields.forEach((field) => container.appendChild(createInput(field, prefix)));
     }
 
     function applyEndpoint(index) {
@@ -406,7 +507,10 @@
         renderFields(queryFields, querySection, endpoint.queryFields || [], "query");
         renderFields(bodyFields, bodySection, endpoint.bodyFields || [], "body");
 
-        endpointHelper.textContent = endpoint.displayLine || endpoint.path;
+        const hasAutomaticPaging = (endpoint.queryFields || []).some((field) => field.name === "page" || field.name === "size");
+        endpointHelper.textContent = hasAutomaticPaging
+            ? (endpoint.displayLine || endpoint.path) + " | The first 100 records are loaded automatically."
+            : (endpoint.displayLine || endpoint.path);
     }
 
     function getFieldValues(container) {
@@ -449,6 +553,17 @@
         const values = getFieldValues(queryFields);
         const params = new URLSearchParams();
         (endpoint.queryFields || []).forEach((field) => {
+            if (field.name === "page") {
+                params.append("page", "0");
+                return;
+            }
+            if (field.name === "size") {
+                params.append("size", "100");
+                return;
+            }
+            if (field.name === "sort") {
+                return;
+            }
             const value = values[field.name];
             if (value !== "") {
                 params.append(field.name, value);
@@ -490,51 +605,212 @@
 
     function formatValue(value) {
         if (value === null || value === undefined || value === "") {
-            return "-";
+            return "Not available";
         }
         if (Array.isArray(value)) {
             return value.join(", ");
         }
-        if (typeof value === "object") {
-            return JSON.stringify(value);
-        }
         return String(value);
     }
 
-    function renderObject(data) {
-        const entries = Object.entries(data || {});
-        if (!entries.length) {
-            responseOutput.innerHTML = '<div class="response-empty">No data returned.</div>';
-            return;
+    function normalizeLabel(value) {
+        return String(value)
+            .replace(/([a-z])([A-Z])/g, "$1 $2")
+            .replace(/^./, (match) => match.toUpperCase());
+    }
+
+    function safeParseJson(value) {
+        if (typeof value !== "string") {
+            return value;
+        }
+        const trimmed = value.trim();
+        if ((!trimmed.startsWith("{") || !trimmed.endsWith("}")) && (!trimmed.startsWith("[") || !trimmed.endsWith("]"))) {
+            return value;
+        }
+        try {
+            return JSON.parse(trimmed);
+        } catch (error) {
+            return value;
+        }
+    }
+
+    function getFriendlyError(parsed) {
+        if (!parsed || typeof parsed !== "object") {
+            return null;
         }
 
-        responseOutput.innerHTML = `
+        if (Array.isArray(parsed.errors) && parsed.errors.length) {
+            return parsed.errors
+                .map((item) => {
+                    if (typeof item === "string") {
+                        return item;
+                    }
+                    if (item && typeof item === "object") {
+                        return item.defaultMessage || item.message || item.code || "One of the submitted values is invalid.";
+                    }
+                    return String(item);
+                })
+                .join(" ");
+        }
+
+        return parsed.detail
+            || parsed.error
+            || parsed.title
+            || parsed.message
+            || null;
+    }
+
+    function isPagedResult(value) {
+        return value && typeof value === "object" && !Array.isArray(value) && Array.isArray(value.content);
+    }
+
+    function unwrapDataEnvelope(value) {
+        if (!value || typeof value !== "object" || Array.isArray(value)) {
+            return value;
+        }
+
+        if (isPagedResult(value)) {
+            return value;
+        }
+        if (Array.isArray(value.data)) {
+            return value.data;
+        }
+        if (value.data && typeof value.data === "object") {
+            return value.data;
+        }
+        if (Array.isArray(value.items)) {
+            return value.items;
+        }
+        if (Array.isArray(value.results)) {
+            return value.results;
+        }
+        if (Array.isArray(value.records)) {
+            return value.records;
+        }
+        return value;
+    }
+
+    function renderSummary(items) {
+        if (!items.length) {
+            return "";
+        }
+        return `
+            <div class="response-summary">
+                ${items.map((item) => `<span class="response-pill">${escapeHtml(item)}</span>`).join("")}
+            </div>
+        `;
+    }
+
+    function renderScalar(value) {
+        return `<div class="message-card"><p>${escapeHtml(formatValue(value))}</p></div>`;
+    }
+
+    function renderValue(value, depth = 0) {
+        const parsed = safeParseJson(value);
+
+        if (parsed === null || parsed === undefined || parsed === "") {
+            return `<span>${escapeHtml(formatValue(parsed))}</span>`;
+        }
+
+        if (Array.isArray(parsed)) {
+            if (!parsed.length) {
+                return `<span>No values</span>`;
+            }
+
+            if (depth >= 1) {
+                if (parsed.some((item) => typeof item === "object" && item !== null)) {
+                    return `
+                        <div class="nested-list">
+                            ${parsed.map((item, index) => `
+                                <div class="nested-item">
+                                    <strong>Item ${index + 1}</strong>
+                                    ${renderValue(item, depth + 1)}
+                                </div>
+                            `).join("")}
+                        </div>
+                    `;
+                }
+                return `
+                    <div class="chip-list">
+                        ${parsed.map((item) => `<span class="chip">${escapeHtml(formatValue(item))}</span>`).join("")}
+                    </div>
+                `;
+            }
+
+            return renderArray(parsed, depth + 1);
+        }
+
+        if (typeof parsed === "object") {
+            if (depth >= 1) {
+                return `
+                    <div class="nested-list">
+                        ${Object.entries(parsed).map(([key, nestedValue]) => `
+                            <div class="nested-item">
+                                <strong>${escapeHtml(normalizeLabel(key))}</strong>
+                                ${renderValue(nestedValue, depth + 1)}
+                            </div>
+                        `).join("")}
+                    </div>
+                `;
+            }
+            return renderObject(parsed, depth + 1);
+        }
+
+        return `<span>${escapeHtml(formatValue(parsed))}</span>`;
+    }
+
+    function renderObject(data, depth = 0) {
+        const normalizedData = unwrapDataEnvelope(data);
+        if (normalizedData !== data) {
+            return renderValue(normalizedData, depth);
+        }
+
+        if (isPagedResult(data)) {
+            const summaryItems = [
+                data.number !== undefined ? `Page ${data.number + 1}` : null,
+                data.size !== undefined ? `Showing up to ${data.size} records` : null,
+                data.totalElements !== undefined ? `Total records ${data.totalElements}` : null,
+                data.totalPages !== undefined ? `Total pages ${data.totalPages}` : null
+            ].filter(Boolean);
+
+            return `
+                <div class="response-stack">
+                    ${renderSummary(summaryItems)}
+                    ${renderArray(data.content || [], depth + 1)}
+                </div>
+            `;
+        }
+
+        const entries = Object.entries(data || {});
+        if (!entries.length) {
+            return '<div class="response-empty">No data returned.</div>';
+        }
+
+        return `
             <div class="detail-grid">
                 ${entries.map(([key, value]) => `
                     <div class="detail-card">
-                        <strong>${escapeHtml(key)}</strong>
-                        <span>${escapeHtml(formatValue(value))}</span>
+                        <strong>${escapeHtml(normalizeLabel(key))}</strong>
+                        ${renderValue(value, depth + 1)}
                     </div>
                 `).join("")}
             </div>
         `;
     }
 
-    function renderArray(data) {
+    function renderArray(data, depth = 0) {
         if (!data.length) {
-            responseOutput.innerHTML = '<div class="response-empty">No records found.</div>';
-            return;
+            return '<div class="response-empty">No records found.</div>';
         }
 
         if (typeof data[0] !== "object" || data[0] === null || Array.isArray(data[0])) {
-            responseOutput.innerHTML = `
-                <div class="detail-grid">
+            return `
+                <div class="chip-list">
                     ${data.map((item) => `
-                        <div class="detail-card"><span>${escapeHtml(formatValue(item))}</span></div>
+                        <span class="chip">${escapeHtml(formatValue(item))}</span>
                     `).join("")}
                 </div>
             `;
-            return;
         }
 
         const columns = Array.from(data.reduce((set, item) => {
@@ -542,43 +818,69 @@
             return set;
         }, new Set()));
 
-        responseOutput.innerHTML = `
-            <div class="table-wrap">
-                <table>
-                    <thead>
-                        <tr>${columns.map((column) => `<th>${escapeHtml(column)}</th>`).join("")}</tr>
-                    </thead>
-                    <tbody>
-                        ${data.map((row) => `
-                            <tr>
-                                ${columns.map((column) => `<td>${escapeHtml(formatValue(row[column]))}</td>`).join("")}
-                            </tr>
-                        `).join("")}
-                    </tbody>
-                </table>
+        const summaryItems = depth === 0 ? [`Showing ${data.length} record${data.length === 1 ? "" : "s"}`] : [];
+        return `
+            <div class="response-stack">
+                ${renderSummary(summaryItems)}
+                <div class="table-wrap">
+                    <table>
+                        <thead>
+                            <tr>${columns.map((column) => `<th>${escapeHtml(normalizeLabel(column))}</th>`).join("")}</tr>
+                        </thead>
+                        <tbody>
+                            ${data.map((row) => `
+                                <tr>
+                                    ${columns.map((column) => `<td>${renderValue(row[column], depth + 1)}</td>`).join("")}
+                                </tr>
+                            `).join("")}
+                        </tbody>
+                    </table>
+                </div>
             </div>
         `;
     }
 
-    function renderResponseBody(body) {
+    function renderFriendlyError(message, details) {
+        responseOutput.innerHTML = `
+            <div class="table-wrap">
+                <div class="message-card">
+                    <strong>${escapeHtml(message)}</strong>
+                    <p>${escapeHtml(details)}</p>
+                </div>
+            </div>
+        `;
+    }
+
+    function renderResponseBody(body, status) {
         if (!body) {
             responseOutput.innerHTML = '<div class="response-empty">Request completed.</div>';
             return;
         }
 
         try {
-            const parsed = JSON.parse(body);
+            const parsed = unwrapDataEnvelope(JSON.parse(body));
+            const friendlyError = getFriendlyError(parsed);
+            if (status >= 400 && friendlyError) {
+                renderFriendlyError("The API could not complete this request.", friendlyError);
+                return;
+            }
+
             if (Array.isArray(parsed)) {
-                renderArray(parsed);
+                responseOutput.innerHTML = renderArray(parsed);
                 return;
             }
             if (typeof parsed === "object" && parsed !== null) {
-                renderObject(parsed);
+                responseOutput.innerHTML = renderObject(parsed);
                 return;
             }
-            responseOutput.innerHTML = `<div class="detail-card"><span>${escapeHtml(String(parsed))}</span></div>`;
+            responseOutput.innerHTML = renderScalar(parsed);
         } catch (error) {
-            responseOutput.innerHTML = `<div class="detail-card"><span>${escapeHtml(body)}</span></div>`;
+            responseOutput.innerHTML = `
+                <div class="message-card">
+                    <strong>Response received</strong>
+                    <p>${escapeHtml(body)}</p>
+                </div>
+            `;
         }
     }
 
@@ -617,16 +919,22 @@
 
             const result = await response.json();
             if (result.error) {
-                setStatus("HTTP " + result.status, "error");
-                responseOutput.innerHTML = `<div class="preview-error">${escapeHtml(result.error)}</div>`;
+                setStatus("Needs attention", "error");
+                renderFriendlyError(
+                    "The request could not be sent.",
+                    result.error || "Please check the path parameters, filters, and backend availability."
+                );
                 return;
             }
 
-            setStatus("HTTP " + result.status, result.status >= 200 && result.status < 300 ? "ok" : "error");
-            renderResponseBody(result.body);
+            setStatus(result.status >= 200 && result.status < 300 ? "Success" : "Needs attention", result.status >= 200 && result.status < 300 ? "ok" : "error");
+            renderResponseBody(result.body, result.status);
         } catch (error) {
-            setStatus("Error", "error");
-            responseOutput.innerHTML = `<div class="preview-error">${escapeHtml(error.message)}</div>`;
+            setStatus("Needs attention", "error");
+            renderFriendlyError(
+                "We could not reach the API.",
+                error.message || "The backend may be unavailable right now."
+            );
         }
     });
 
