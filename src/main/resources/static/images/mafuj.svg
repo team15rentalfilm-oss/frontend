@@ -1,6 +1,0 @@
-<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 240 240">
-  <rect width="240" height="240" rx="36" fill="#e6f0ea"/>
-  <circle cx="120" cy="92" r="42" fill="#0b6e4f"/>
-  <path d="M56 192c12-36 43-54 64-54s52 18 64 54" fill="#0b6e4f"/>
-  <text x="120" y="222" text-anchor="middle" font-family="Segoe UI, Arial, sans-serif" font-size="22" fill="#194236">MG</text>
-</svg>
