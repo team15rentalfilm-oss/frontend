@@ -1,0 +1,474 @@
+<!DOCTYPE html>
+<html xmlns:th="http://www.thymeleaf.org">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title th:text="${title + ' - Results'}">Results</title>
+    <style>
+        *,
+        *::before,
+        *::after {
+            box-sizing: border-box;
+        }
+
+        body {
+            margin: 0;
+            font-family: "Segoe UI", Tahoma, sans-serif;
+            background: #0f1115;
+            color: #f3f4f6;
+        }
+
+        .shell {
+            max-width: 1440px;
+            margin: 0 auto;
+            padding: 24px 20px 40px;
+        }
+
+        .topbar {
+            display: flex;
+            flex-wrap: wrap;
+            justify-content: space-between;
+            align-items: center;
+            gap: 12px;
+            margin-bottom: 20px;
+        }
+
+        .back-link,
+        .action-button {
+            display: inline-flex;
+            align-items: center;
+            justify-content: center;
+            padding: 10px 14px;
+            border: 1px solid #2c313b;
+            border-radius: 10px;
+            background: #171a21;
+            color: #f3f4f6;
+            text-decoration: none;
+            font: inherit;
+            cursor: pointer;
+        }
+
+        .header h1 {
+            margin: 0 0 8px;
+            font-size: 2rem;
+            font-weight: 600;
+        }
+
+        .header p {
+            margin: 0;
+            color: #a3aab7;
+        }
+
+        .panel {
+            background: #171a21;
+            border: 1px solid #22262e;
+            border-radius: 14px;
+            padding: 16px;
+            min-width: 0;
+        }
+
+        .status-row {
+            display: flex;
+            flex-wrap: wrap;
+            gap: 10px;
+            align-items: center;
+            margin-bottom: 14px;
+        }
+
+        .status,
+        .pill {
+            display: inline-flex;
+            align-items: center;
+            padding: 6px 10px;
+            border-radius: 999px;
+            font-size: 0.85rem;
+            background: #20252d;
+            color: #d1d5db;
+        }
+
+        .status.ok {
+            background: #edf7f0;
+            color: #1c6b37;
+        }
+
+        .status.error {
+            background: #fdeeee;
+            color: #9d2b2b;
+        }
+
+        .response-empty {
+            color: #9ca3af;
+            font-size: 0.95rem;
+        }
+
+        .table-wrap {
+            overflow-x: auto;
+        }
+
+        table {
+            width: 100%;
+            border-collapse: collapse;
+            font-size: 0.94rem;
+        }
+
+        th,
+        td {
+            padding: 12px 14px;
+            border-bottom: 1px solid #2c313b;
+            text-align: left;
+            vertical-align: top;
+        }
+
+        th {
+            background: #11141a;
+            color: #e5e7eb;
+            font-weight: 600;
+        }
+
+        td {
+            color: #c4cad4;
+            word-break: break-word;
+        }
+
+        .pagination-row {
+            display: flex;
+            flex-wrap: wrap;
+            align-items: center;
+            gap: 10px;
+            margin: 16px 0 0;
+        }
+
+        .message-card {
+            padding: 14px;
+            border-radius: 10px;
+            border: 1px solid #22262e;
+            background: #11141a;
+        }
+
+        .message-card strong {
+            display: block;
+            margin-bottom: 6px;
+            color: #f3f4f6;
+        }
+
+        .message-card p {
+            margin: 0;
+            color: #c4cad4;
+            line-height: 1.5;
+        }
+    </style>
+</head>
+<body>
+<main class="shell">
+    <div class="topbar">
+        <a class="back-link" href="javascript:window.close()">&larr; Close tab</a>
+        <button class="action-button" type="button" id="refreshButton">Refresh</button>
+    </div>
+
+    <section class="header">
+        <h1 th:text="${title}">Results</h1>
+        <p th:text="${method + ' ' + path}">GET /api/example</p>
+    </section>
+
+    <section class="panel">
+        <div class="status-row">
+            <span class="status" id="statusBadge">Ready</span>
+            <span class="pill" th:text="${method}">GET</span>
+        </div>
+        <div id="responseOutput">
+            <div class="response-empty">Your results will appear here.</div>
+        </div>
+    </section>
+</main>
+
+<script th:inline="javascript">
+    const pageTitle = /*[[${title}]]*/ "Results";
+    const requestMethod = /*[[${method}]]*/ "GET";
+    const initialPath = /*[[${path}]]*/ "/api/example";
+    const statusBadge = document.getElementById("statusBadge");
+    const responseOutput = document.getElementById("responseOutput");
+    let currentPath = initialPath;
+
+    function setStatus(text, cssClass) {
+        statusBadge.textContent = text;
+        statusBadge.className = "status" + (cssClass ? " " + cssClass : "");
+    }
+
+    function escapeHtml(value) {
+        return String(value)
+            .replaceAll("&", "&amp;")
+            .replaceAll("<", "&lt;")
+            .replaceAll(">", "&gt;");
+    }
+
+    function formatValue(value) {
+        if (value === null || value === undefined || value === "") {
+            return "Not available";
+        }
+        if (Array.isArray(value)) {
+            return value.join(", ");
+        }
+        return String(value);
+    }
+
+    function normalizeLabel(value) {
+        return String(value)
+            .replace(/([a-z])([A-Z])/g, "$1 $2")
+            .replace(/^./, (match) => match.toUpperCase());
+    }
+
+    function safeParseJson(value) {
+        if (typeof value !== "string") {
+            return value;
+        }
+        const trimmed = value.trim();
+        if ((!trimmed.startsWith("{") || !trimmed.endsWith("}")) && (!trimmed.startsWith("[") || !trimmed.endsWith("]"))) {
+            return value;
+        }
+        try {
+            return JSON.parse(trimmed);
+        } catch (error) {
+            return value;
+        }
+    }
+
+    function summarizeObject(value) {
+        if (!value || typeof value !== "object" || Array.isArray(value)) {
+            return value;
+        }
+        if (value.country) {
+            return value.country;
+        }
+        if (value.city) {
+            return value.city;
+        }
+        if (value.name) {
+            return value.name;
+        }
+        if (value.title) {
+            return value.title;
+        }
+        if (value.firstName || value.lastName) {
+            return [value.firstName, value.lastName].filter(Boolean).join(" ");
+        }
+        const identifier = Object.entries(value).find(([key, nestedValue]) =>
+            /id$/i.test(key) && nestedValue !== null && nestedValue !== undefined && nestedValue !== ""
+        );
+        return identifier ? identifier[1] : JSON.stringify(value);
+    }
+
+    function summarizeValue(value) {
+        const parsed = safeParseJson(value);
+        if (Array.isArray(parsed)) {
+            if (!parsed.length) {
+                return "None";
+            }
+            return parsed.slice(0, 4).map((item) => formatValue(summarizeValue(item))).join(", ");
+        }
+        if (parsed && typeof parsed === "object") {
+            return summarizeObject(parsed);
+        }
+        return parsed;
+    }
+
+    function orderColumns(columns) {
+        const priority = [
+            "actorId",
+            "addressId",
+            "categoryId",
+            "cityId",
+            "countryId",
+            "customerId",
+            "filmId",
+            "inventoryId",
+            "languageId",
+            "paymentId",
+            "rentalId",
+            "staffId",
+            "storeId",
+            "id",
+            "country",
+            "city",
+            "name",
+            "title",
+            "firstName",
+            "lastName"
+        ];
+
+        return [...columns].sort((left, right) => {
+            const leftPriority = priority.indexOf(left);
+            const rightPriority = priority.indexOf(right);
+
+            if (leftPriority !== -1 || rightPriority !== -1) {
+                if (leftPriority === -1) {
+                    return 1;
+                }
+                if (rightPriority === -1) {
+                    return -1;
+                }
+                return leftPriority - rightPriority;
+            }
+
+            const leftIsId = /id$/i.test(left);
+            const rightIsId = /id$/i.test(right);
+            if (leftIsId !== rightIsId) {
+                return leftIsId ? -1 : 1;
+            }
+
+            return left.localeCompare(right);
+        });
+    }
+
+    function collectColumns(data) {
+        const columns = Array.from(data.reduce((set, item) => {
+            Object.keys(item || {}).forEach((key) => set.add(key));
+            return set;
+        }, new Set()));
+
+        return orderColumns(columns);
+    }
+
+    function isPagedResult(value) {
+        return value && typeof value === "object" && !Array.isArray(value) && Array.isArray(value.content);
+    }
+
+    function renderPaginationControls(data) {
+        if (!isPagedResult(data) || !data.totalPages || data.totalPages <= 1) {
+            return "";
+        }
+
+        const currentPage = Number.isFinite(data.number) ? data.number : 0;
+        const totalPages = Math.max(Number.isFinite(data.totalPages) ? data.totalPages : 1, 1);
+        const totalItems = Number.isFinite(data.totalElements) ? data.totalElements : (data.content || []).length;
+
+        return `
+            <div class="pagination-row">
+                <button class="action-button" type="button" data-page-target="${currentPage - 1}" ${currentPage <= 0 ? "disabled" : ""}>Previous page</button>
+                <span class="pill">Page ${currentPage + 1} of ${totalPages}</span>
+                <span class="pill">Total items ${totalItems}</span>
+                <button class="action-button" type="button" data-page-target="${currentPage + 1}" ${currentPage + 1 >= totalPages ? "disabled" : ""}>Next page</button>
+            </div>
+        `;
+    }
+
+    function updatePageInPath(path, nextPage) {
+        const [basePath, queryString = ""] = path.split("?");
+        const params = new URLSearchParams(queryString);
+        params.set("page", String(Math.max(nextPage, 0)));
+        return `${basePath}?${params.toString()}`;
+    }
+
+    function renderTable(data) {
+        if (!data.length) {
+            return '<div class="response-empty">No matching items found.</div>';
+        }
+
+        const columns = collectColumns(data);
+        return `
+            <div class="table-wrap">
+                <table>
+                    <thead>
+                        <tr>${columns.map((column) => `<th>${escapeHtml(normalizeLabel(column))}</th>`).join("")}</tr>
+                    </thead>
+                    <tbody>
+                        ${data.map((row) => `
+                            <tr>
+                                ${columns.map((column) => `<td>${escapeHtml(formatValue(summarizeValue(row ? row[column] : null)))}</td>`).join("")}
+                            </tr>
+                        `).join("")}
+                    </tbody>
+                </table>
+            </div>
+        `;
+    }
+
+    function renderResultBody(body) {
+        if (!body) {
+            responseOutput.innerHTML = '<div class="response-empty">Nothing to show.</div>';
+            return;
+        }
+
+        try {
+            const parsed = JSON.parse(body);
+            if (isPagedResult(parsed)) {
+                responseOutput.innerHTML = `
+                    ${renderTable(parsed.content || [])}
+                    ${renderPaginationControls(parsed)}
+                `;
+                return;
+            }
+            if (Array.isArray(parsed)) {
+                responseOutput.innerHTML = renderTable(parsed);
+                return;
+            }
+            responseOutput.innerHTML = `
+                <div class="message-card">
+                    <strong>Result received</strong>
+                    <p>This view is designed for list results.</p>
+                </div>
+            `;
+        } catch (error) {
+            responseOutput.innerHTML = `
+                <div class="message-card">
+                    <strong>Result received</strong>
+                    <p>${escapeHtml(body)}</p>
+                </div>
+            `;
+        }
+    }
+
+    async function loadResults(path) {
+        currentPath = path;
+        setStatus("Working", "");
+        responseOutput.innerHTML = '<div class="response-empty">Working on it...</div>';
+
+        try {
+            const response = await fetch("/ui/api-explorer/execute", {
+                method: "POST",
+                headers: { "Content-Type": "application/json" },
+                body: JSON.stringify({
+                    method: requestMethod,
+                    path: currentPath,
+                    body: ""
+                })
+            });
+
+            const result = await response.json();
+            if (result.error) {
+                setStatus("Check details", "error");
+                responseOutput.innerHTML = `
+                    <div class="message-card">
+                        <strong>We could not load the results.</strong>
+                        <p>${escapeHtml(result.error)}</p>
+                    </div>
+                `;
+                return;
+            }
+
+            setStatus(result.status >= 200 && result.status < 300 ? "Done" : "Check details", result.status >= 200 && result.status < 300 ? "ok" : "error");
+            renderResultBody(result.body);
+        } catch (error) {
+            setStatus("Unavailable", "error");
+            responseOutput.innerHTML = `
+                <div class="message-card">
+                    <strong>We could not connect right now.</strong>
+                    <p>${escapeHtml(error.message || "The service may be temporarily unavailable.")}</p>
+                </div>
+            `;
+        }
+    }
+
+    document.getElementById("refreshButton").addEventListener("click", () => loadResults(currentPath));
+
+    responseOutput.addEventListener("click", (event) => {
+        const trigger = event.target.closest("[data-page-target]");
+        if (!trigger || trigger.disabled) {
+            return;
+        }
+        loadResults(updatePageInPath(currentPath, Number(trigger.dataset.pageTarget)));
+    });
+
+    loadResults(initialPath);
+</script>
+</body>
+</html>

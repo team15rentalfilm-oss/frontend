@@ -812,9 +812,7 @@
 
         const city = {};
         includeIfPresent(city, "city", values.city);
-        if (!isEmptyValue(values.country)) {
-            city.country = { country: values.country };
-        }
+        includeIfPresent(city, "country", values.country);
         return Object.keys(city).length ? city : null;
     }
 
@@ -852,9 +850,7 @@
 
         const body = {};
         includeIfPresent(body, "city", values.city);
-        if (!isEmptyValue(values.country)) {
-            body.country = { country: values.country };
-        }
+        includeIfPresent(body, "country", values.country);
         return Object.keys(body).length ? JSON.stringify(body) : "";
     }
 
