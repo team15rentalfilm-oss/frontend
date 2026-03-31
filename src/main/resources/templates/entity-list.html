@@ -519,6 +519,14 @@
     let lastRequestPayload = null;
     let responsePagination = null;
     const expandedPagingEntities = new Set(["films", "staff", "payments", "rentals"]);
+    const strictRequestEntities = new Set(["addresses", "cities", "customers", "films", "stores"]);
+    const entityRequestHints = {
+        addresses: "Send nested city and country values. PUT requires the full body.",
+        cities: "Send country as a nested object. PUT requires the full body.",
+        customers: "Send storeId and a nested address object. PUT requires the full body.",
+        films: "Send language as text plus categories and actors as string lists. PUT requires the full body.",
+        stores: "Send managerStaffId and a nested address object. PUT requires the full body."
+    };
 
     function isManagedQueryField(fieldName) {
         return fieldName === "page" || fieldName === "size" || fieldName === "sort";
@@ -538,7 +546,7 @@
 
     function createInput(field, prefix) {
         const wrapper = document.createElement("label");
-        wrapper.textContent = field.label;
+        wrapper.textContent = field.optional ? field.label + " (optional)" : field.label;
 
         let input;
         if (field.type === "boolean") {
@@ -559,8 +567,10 @@
 
         input.name = field.name;
         input.dataset.type = field.type;
+        input.dataset.optional = String(Boolean(field.optional));
         input.id = prefix + "-" + field.name;
         input.placeholder = field.placeholder || "";
+        input.required = !field.optional;
         wrapper.appendChild(input);
         return wrapper;
     }
@@ -589,9 +599,13 @@
         renderFields(bodyFields, bodySection, endpoint.bodyFields || [], "body");
 
         const hasAutomaticPaging = isPagedEndpoint(endpoint);
-        endpointHelper.textContent = hasAutomaticPaging
+        const helperText = hasAutomaticPaging
             ? (endpoint.displayLine || endpoint.path) + " | " + defaultPageSize(endpoint) + " records are loaded per page."
             : (endpoint.displayLine || endpoint.path);
+        const hint = endpoint.bodyFields && endpoint.bodyFields.length && strictRequestEntities.has(entityKey)
+            ? entityRequestHints[entityKey]
+            : "";
+        endpointHelper.textContent = hint ? helperText + " | " + hint : helperText;
     }
 
     function getFieldValues(container) {
@@ -659,17 +673,190 @@
             return "";
         }
 
-        const body = {};
         const isPatch = endpoint.method === "PATCH";
-        bodyFields.querySelectorAll("input, select").forEach((input) => {
-            const value = convertValue(input.value.trim(), input.dataset.type);
-            if (isPatch && (value === null || value === "" || (Array.isArray(value) && !value.length))) {
+        const values = readBodyValues();
+
+        if (strictRequestEntities.has(entityKey)) {
+            return buildStrictBody(endpoint, values, isPatch);
+        }
+
+        const body = {};
+        Object.entries(values).forEach(([name, value]) => {
+            if (isEmptyValue(value)) {
                 return;
             }
-            body[input.name] = value;
+            body[name] = value;
         });
 
         return Object.keys(body).length ? JSON.stringify(body) : "";
+    }
+
+    function readBodyValues() {
+        const values = {};
+        bodyFields.querySelectorAll("input, select").forEach((input) => {
+            values[input.name] = convertValue(input.value.trim(), input.dataset.type);
+        });
+        return values;
+    }
+
+    function isEmptyValue(value) {
+        return value === null || value === undefined || value === "" || (Array.isArray(value) && !value.length);
+    }
+
+    function includeIfPresent(target, key, value) {
+        if (!isEmptyValue(value)) {
+            target[key] = value;
+        }
+    }
+
+    function requireFields(values, fields, labels = {}) {
+        const missing = fields.filter((field) => isEmptyValue(values[field]));
+        if (!missing.length) {
+            return;
+        }
+        throw new Error("Provide " + missing.map((field) => labels[field] || normalizeLabel(field)).join(", ") + ".");
+    }
+
+    function buildCityObject(values, requireAll) {
+        if (requireAll) {
+            requireFields(values, ["city", "country"]);
+        }
+
+        if (isEmptyValue(values.city) && isEmptyValue(values.country)) {
+            return null;
+        }
+
+        const city = {};
+        includeIfPresent(city, "city", values.city);
+        if (!isEmptyValue(values.country)) {
+            city.country = { country: values.country };
+        }
+        return Object.keys(city).length ? city : null;
+    }
+
+    function buildNestedAddress(values, requireAll) {
+        if (requireAll) {
+            requireFields(values, ["address", "district", "postalCode", "phone", "city", "country"], {
+                postalCode: "Postal Code"
+            });
+        }
+
+        const address = {};
+        includeIfPresent(address, "address", values.address);
+        includeIfPresent(address, "address2", values.address2);
+        includeIfPresent(address, "district", values.district);
+        includeIfPresent(address, "postalCode", values.postalCode);
+        includeIfPresent(address, "phone", values.phone);
+
+        const city = buildCityObject(values, requireAll);
+        if (city) {
+            address.city = city;
+        }
+
+        return Object.keys(address).length ? address : null;
+    }
+
+    function buildAddressBody(values, isPatch) {
+        const body = buildNestedAddress(values, !isPatch);
+        return body ? JSON.stringify(body) : "";
+    }
+
+    function buildCityBody(values, isPatch) {
+        if (!isPatch) {
+            requireFields(values, ["city", "country"]);
+        }
+
+        const body = {};
+        includeIfPresent(body, "city", values.city);
+        if (!isEmptyValue(values.country)) {
+            body.country = { country: values.country };
+        }
+        return Object.keys(body).length ? JSON.stringify(body) : "";
+    }
+
+    function buildCustomerBody(values, isPatch) {
+        if (!isPatch) {
+            requireFields(values, ["firstName", "lastName", "storeId", "address", "district", "postalCode", "phone", "city", "country"], {
+                storeId: "Store Id",
+                postalCode: "Postal Code"
+            });
+        }
+
+        const body = {};
+        includeIfPresent(body, "firstName", values.firstName);
+        includeIfPresent(body, "lastName", values.lastName);
+        includeIfPresent(body, "email", values.email);
+        includeIfPresent(body, "storeId", values.storeId);
+
+        if (isPatch) {
+            includeIfPresent(body, "active", values.active);
+        } else {
+            body.active = isEmptyValue(values.active) ? true : values.active;
+        }
+
+        const address = buildNestedAddress(values, !isPatch);
+        if (address) {
+            body.address = address;
+        }
+
+        return Object.keys(body).length ? JSON.stringify(body) : "";
+    }
+
+    function buildFilmBody(values, isPatch) {
+        if (!isPatch) {
+            requireFields(values, ["title", "language", "categories", "actors"]);
+        }
+
+        const body = {};
+        includeIfPresent(body, "title", values.title);
+        includeIfPresent(body, "description", values.description);
+        includeIfPresent(body, "releaseYear", values.releaseYear);
+        includeIfPresent(body, "language", values.language);
+        includeIfPresent(body, "categories", values.categories);
+        includeIfPresent(body, "actors", values.actors);
+        includeIfPresent(body, "rentalDuration", values.rentalDuration);
+        includeIfPresent(body, "rentalRate", values.rentalRate);
+        includeIfPresent(body, "length", values.length);
+        includeIfPresent(body, "replacementCost", values.replacementCost);
+        includeIfPresent(body, "rating", values.rating);
+        includeIfPresent(body, "specialFeatures", values.specialFeatures);
+        return Object.keys(body).length ? JSON.stringify(body) : "";
+    }
+
+    function buildStoreBody(values, isPatch) {
+        if (!isPatch) {
+            requireFields(values, ["managerStaffId", "address", "district", "postalCode", "phone", "city", "country"], {
+                managerStaffId: "Manager Staff Id",
+                postalCode: "Postal Code"
+            });
+        }
+
+        const body = {};
+        includeIfPresent(body, "managerStaffId", values.managerStaffId);
+
+        const address = buildNestedAddress(values, !isPatch);
+        if (address) {
+            body.address = address;
+        }
+
+        return Object.keys(body).length ? JSON.stringify(body) : "";
+    }
+
+    function buildStrictBody(endpoint, values, isPatch) {
+        switch (entityKey) {
+            case "addresses":
+                return buildAddressBody(values, isPatch);
+            case "cities":
+                return buildCityBody(values, isPatch);
+            case "customers":
+                return buildCustomerBody(values, isPatch);
+            case "films":
+                return buildFilmBody(values, isPatch);
+            case "stores":
+                return buildStoreBody(values, isPatch);
+            default:
+                return "";
+        }
     }
 
     function setStatus(text, cssClass) {
@@ -872,6 +1059,13 @@
             return null;
         }
 
+        if (parsed.errors && typeof parsed.errors === "object" && !Array.isArray(parsed.errors)) {
+            const fieldErrors = Object.entries(parsed.errors)
+                .map(([field, message]) => `${normalizeLabel(field)}: ${Array.isArray(message) ? message.join(", ") : message}`)
+                .join(" ");
+            return [parsed.message, fieldErrors].filter(Boolean).join(" ");
+        }
+
         if (Array.isArray(parsed.errors) && parsed.errors.length) {
             return parsed.errors
                 .map((item) => {
@@ -891,6 +1085,14 @@
             || parsed.title
             || parsed.message
             || null;
+    }
+
+    function getBackendGuidance(message) {
+        if (!message || !message.includes("Could not initialize proxy")) {
+            return null;
+        }
+
+        return "Backend issue: the Address list endpoint is returning a lazy Hibernate proxy for Country after the session closed. Fix `/api/addresses` by mapping to DTOs inside the transaction or by fetch-joining `address.city.country` before serialization.";
     }
 
     function isPagedResult(value) {
@@ -1141,12 +1343,13 @@
         `;
     }
 
-    function renderFriendlyError(message, details) {
+    function renderFriendlyError(message, details, guidance = null) {
         responseOutput.innerHTML = `
             <div class="table-wrap">
                 <div class="message-card">
                     <strong>${escapeHtml(message)}</strong>
                     <p>${escapeHtml(details)}</p>
+                    ${guidance ? `<p style="margin-top: 10px;">${escapeHtml(guidance)}</p>` : ""}
                 </div>
             </div>
         `;
@@ -1163,7 +1366,11 @@
             const parsed = unwrapDataEnvelope(JSON.parse(body));
             const friendlyError = getFriendlyError(parsed);
             if (status >= 400 && friendlyError) {
-                renderFriendlyError("The API could not complete this request.", friendlyError);
+                renderFriendlyError(
+                    "The API could not complete this request.",
+                    friendlyError,
+                    getBackendGuidance(friendlyError)
+                );
                 return;
             }
 
@@ -1251,12 +1458,17 @@
 
     document.getElementById("sendButton").addEventListener("click", async () => {
         const endpoint = endpointConfigs[selectedIndex];
-        const payload = {
-            method: endpoint.method,
-            path: buildPath(endpoint) + buildQuery(endpoint),
-            body: buildBody(endpoint)
-        };
-        executePayload(payload);
+        try {
+            const payload = {
+                method: endpoint.method,
+                path: buildPath(endpoint) + buildQuery(endpoint),
+                body: buildBody(endpoint)
+            };
+            executePayload(payload);
+        } catch (error) {
+            setStatus("Needs attention", "error");
+            renderFriendlyError("The request body is incomplete.", error.message || "Check the required fields and try again.");
+        }
     });
 
     applyEndpoint(0);

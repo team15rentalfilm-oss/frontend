@@ -8,22 +8,12 @@ import com.iem.frontend.catalog.ExplorerCatalog;
 import com.iem.frontend.catalog.ExplorerCatalog.EndpointDefinition;
 import com.iem.frontend.catalog.ExplorerCatalog.EntityDefinition;
 import com.iem.frontend.catalog.ExplorerCatalog.MemberDefinition;
-import org.springframework.http.MediaType;
-import org.springframework.http.ResponseEntity;
-import org.springframework.stereotype.Controller;
 import org.springframework.ui.Model;
-import org.springframework.web.bind.annotation.GetMapping;
-import org.springframework.web.bind.annotation.PathVariable;
-import org.springframework.web.bind.annotation.PostMapping;
-import org.springframework.web.bind.annotation.RequestBody;
-import org.springframework.web.bind.annotation.ResponseBody;
 import org.springframework.web.server.ResponseStatusException;
 import org.springframework.web.util.UriComponentsBuilder;
-import jakarta.servlet.http.HttpServletRequest;
 
 import java.io.IOException;
 import java.net.URI;
-import java.net.URISyntaxException;
 import java.net.http.HttpClient;
 import java.net.http.HttpRequest;
 import java.net.http.HttpResponse;
@@ -37,12 +27,9 @@ import java.util.Map;
 import java.util.regex.Matcher;
 import java.util.regex.Pattern;
 
-import static org.springframework.http.HttpStatus.BAD_GATEWAY;
-import static org.springframework.http.HttpStatus.BAD_REQUEST;
 import static org.springframework.http.HttpStatus.NOT_FOUND;
 
-@Controller
-public class EntityUIController {
+abstract class BaseEntityPageController {
 
     private static final int PREVIEW_LIMIT = 8;
     private static final Pattern PATH_VARIABLE_PATTERN = Pattern.compile("\\{([^/{}]+)}");
@@ -53,8 +40,7 @@ public class EntityUIController {
 
     private final ObjectMapper objectMapper = new ObjectMapper();
 
-    @GetMapping("/entities/{entityKey}")
-    public String viewEntity(@PathVariable String entityKey, @org.springframework.web.bind.annotation.RequestParam(name = "previewPage", defaultValue = "0") int previewPage, Model model) {
+    protected String renderEntityPage(String entityKey, int previewPage, Model model) {
         EntityDefinition entity = ExplorerCatalog.entity(entityKey);
         if (entity == null) {
             throw new ResponseStatusException(NOT_FOUND, "Unknown entity: " + entityKey);
@@ -83,117 +69,6 @@ public class EntityUIController {
         return "entity-list";
     }
 
-    @GetMapping({
-            "/actors",
-            "/addresses",
-            "/categories",
-            "/cities",
-            "/countries",
-            "/customers",
-            "/film-actor",
-            "/films",
-            "/inventory",
-            "/inventories",
-            "/languages",
-            "/payments",
-            "/rentals",
-            "/staff",
-            "/stores"
-    })
-    public String legacyPluralRoute(HttpServletRequest request) {
-        return redirectLegacyPath(request);
-    }
-
-    @PostMapping(value = "/ui/api-explorer/execute", consumes = MediaType.APPLICATION_JSON_VALUE, produces = MediaType.APPLICATION_JSON_VALUE)
-    @ResponseBody
-    public ResponseEntity<ApiExplorerResponse> execute(@RequestBody ApiExplorerRequest request) {
-        String method = request.method() == null ? "" : request.method().trim().toUpperCase(Locale.ROOT);
-        String path = request.path() == null ? "" : request.path().trim();
-
-        if (method.isEmpty() || path.isEmpty()) {
-            return ResponseEntity.ok()
-                    .body(ApiExplorerResponse.error(BAD_REQUEST.value(), "Method and path are required."));
-        }
-        if (!path.startsWith("/")) {
-            return ResponseEntity.ok()
-                    .body(ApiExplorerResponse.error(BAD_REQUEST.value(), "Path must start with '/'."));
-        }
-
-        try {
-            HttpRequest backendRequest = buildBackendRequest(method, path, request.body());
-            HttpResponse<String> backendResponse = httpClient.send(backendRequest, HttpResponse.BodyHandlers.ofString());
-
-            return ResponseEntity.ok()
-                    .body(new ApiExplorerResponse(
-                            backendResponse.statusCode(),
-                            method,
-                            path,
-                            prettyBody(backendResponse.body()),
-                            backendResponse.headers().map(),
-                            null
-                    ));
-        } catch (IllegalArgumentException ex) {
-            return ResponseEntity.ok()
-                    .body(ApiExplorerResponse.error(BAD_REQUEST.value(), ex.getMessage()));
-        } catch (IOException | InterruptedException ex) {
-            if (ex instanceof InterruptedException) {
-                Thread.currentThread().interrupt();
-            }
-            return ResponseEntity.ok()
-                    .body(ApiExplorerResponse.error(BAD_GATEWAY.value(), "Backend request failed: " + ex.getMessage()));
-        }
-    }
-
-    private String redirectLegacyPath(HttpServletRequest request) {
-        String entityKey = switch (request.getRequestURI()) {
-            case "/actors" -> "actors";
-            case "/addresses" -> "addresses";
-            case "/categories" -> "categories";
-            case "/cities" -> "cities";
-            case "/countries" -> "countries";
-            case "/customers" -> "customers";
-            case "/film-actor" -> "film-actor";
-            case "/films" -> "films";
-            case "/inventory", "/inventories" -> "inventory";
-            case "/languages" -> "languages";
-            case "/payments" -> "payments";
-            case "/rentals" -> "rentals";
-            case "/staff" -> "staff";
-            case "/stores" -> "stores";
-            default -> null;
-        };
-
-        if (entityKey == null) {
-            throw new ResponseStatusException(NOT_FOUND, "Unknown legacy route: " + request.getRequestURI());
-        }
-        return "redirect:/entities/" + entityKey;
-    }
-
-    private HttpRequest buildBackendRequest(String method, String path, String body) {
-        URI uri;
-        try {
-            uri = new URI(ExplorerCatalog.BASE_API_URL + path);
-        } catch (URISyntaxException ex) {
-            throw new IllegalArgumentException("Invalid path or query string.");
-        }
-
-        HttpRequest.Builder builder = HttpRequest.newBuilder(uri)
-                .timeout(Duration.ofSeconds(20))
-                .header("Accept", "application/json");
-
-        boolean hasBody = body != null && !body.isBlank();
-        if (hasBody) {
-            builder.header("Content-Type", "application/json");
-        }
-
-        return switch (method) {
-            case "GET" -> builder.GET().build();
-            case "DELETE" -> builder.DELETE().build();
-            case "POST", "PUT", "PATCH" -> builder.method(method, HttpRequest.BodyPublishers.ofString(hasBody ? body : "")).build();
-            default -> throw new IllegalArgumentException("Unsupported method: " + method);
-        };
-    }
-
     private PreviewData fetchPreview(String collectionPath, int previewPage) {
         try {
             String previewPath = resolvePreviewPath(collectionPath, previewPage);
@@ -205,7 +80,7 @@ public class EntityUIController {
 
             HttpResponse<String> response = httpClient.send(request, HttpResponse.BodyHandlers.ofString());
             if (response.statusCode() < 200 || response.statusCode() >= 300) {
-                return new PreviewData(List.of(), List.of(), "Preview unavailable. Backend returned HTTP " + response.statusCode() + ".", false, 0, 1, 0);
+                return new PreviewData(List.of(), List.of(), describePreviewFailure(response), false, 0, 1, 0);
             }
 
             JsonNode root = objectMapper.readTree(response.body());
@@ -235,7 +110,6 @@ public class EntityUIController {
             }
 
             List<String> columns = choosePreviewColumns(rows);
-
             return new PreviewData(columns, rows, null, paged, pageNumber, totalPages, totalElements);
         } catch (IOException | InterruptedException ex) {
             if (ex instanceof InterruptedException) {
@@ -243,6 +117,35 @@ public class EntityUIController {
             }
             return new PreviewData(List.of(), List.of(), "Preview unavailable. Confirm the backend is running on " + ExplorerCatalog.BASE_API_URL + ".", false, 0, 1, 0);
         }
+    }
+
+    private String describePreviewFailure(HttpResponse<String> response) {
+        String backendError = extractBackendErrorMessage(response.body());
+        if (backendError != null && backendError.contains("Could not initialize proxy")) {
+            return "Preview unavailable. Backend lazy-loading failed for Address -> City -> Country. Fetch or map nested data inside the transaction before returning the response.";
+        }
+        return "Preview unavailable. Backend returned HTTP " + response.statusCode() + ".";
+    }
+
+    private String extractBackendErrorMessage(String body) {
+        if (body == null || body.isBlank()) {
+            return null;
+        }
+        try {
+            JsonNode root = objectMapper.readTree(body);
+            if (root.hasNonNull("message")) {
+                return root.get("message").asText();
+            }
+            if (root.hasNonNull("detail")) {
+                return root.get("detail").asText();
+            }
+            if (root.hasNonNull("error")) {
+                return root.get("error").asText();
+            }
+        } catch (JsonProcessingException ignored) {
+            return body;
+        }
+        return body;
     }
 
     private String resolvePreviewPath(String collectionPath, int previewPage) {
@@ -263,29 +166,10 @@ public class EntityUIController {
 
         List<String> candidates = new ArrayList<>(rows.get(0).keySet());
         List<String> preferred = List.of(
-                "id",
-                "filmId",
-                "actorId",
-                "countryId",
-                "cityId",
-                "categoryId",
-                "inventoryId",
-                "paymentId",
-                "rentalId",
-                "staffId",
-                "storeId",
-                "customerId",
-                "title",
-                "name",
-                "country",
-                "city",
-                "firstName",
-                "lastName",
-                "language",
-                "releaseYear",
-                "rating",
-                "email",
-                "active"
+                "id", "filmId", "actorId", "countryId", "cityId", "categoryId", "inventoryId",
+                "paymentId", "rentalId", "staffId", "storeId", "customerId", "title", "name",
+                "country", "city", "firstName", "lastName", "language", "releaseYear",
+                "rating", "email", "active"
         );
 
         List<String> columns = new ArrayList<>();
@@ -385,7 +269,7 @@ public class EntityUIController {
                     config.put("responseSchema", endpoint.responseSchema());
                     config.put("displayLine", endpoint.displayLine());
                     config.put("pathFields", buildPathFields(endpoint));
-                    config.put("queryFields", buildQueryFields(entity, endpoint));
+                    config.put("queryFields", buildQueryFields(endpoint));
                     config.put("bodyFields", buildBodyFields(entity, endpoint));
                     return config;
                 })
@@ -408,17 +292,13 @@ public class EntityUIController {
         return fields;
     }
 
-    private List<FieldConfig> buildQueryFields(EntityDefinition entity, EndpointDefinition endpoint) {
-        return buildQueryFieldsFromPath(endpoint.path());
-    }
-
-    private List<FieldConfig> buildQueryFieldsFromPath(String path) {
-        int index = path.indexOf('?');
-        if (index < 0 || index == path.length() - 1) {
+    private List<FieldConfig> buildQueryFields(EndpointDefinition endpoint) {
+        int index = endpoint.path().indexOf('?');
+        if (index < 0 || index == endpoint.path().length() - 1) {
             return List.of();
         }
 
-        String query = path.substring(index + 1);
+        String query = endpoint.path().substring(index + 1);
         return Arrays.stream(query.split("&"))
                 .map(part -> part.contains("=") ? part.substring(0, part.indexOf('=')) : part)
                 .filter(part -> !part.isBlank())
@@ -431,19 +311,103 @@ public class EntityUIController {
             return List.of();
         }
 
-        List<String> fields = switch (entity.key() + ":" + endpoint.method()) {
-            case "inventory:PATCH" -> List.of("filmId", "storeId");
-            default -> endpoint.method().equals("PATCH")
-                    || endpoint.bodySchema().toLowerCase(Locale.ROOT).contains("patch")
-                    ? entity.schemaFields().stream()
-                    .filter(field -> !field.equals("id") && !field.equals("createDate") && !field.equals("lastUpdate"))
-                    .toList()
-                    : entity.schemaFields();
+        return switch (entity.key() + ":" + endpoint.method()) {
+            case "addresses:POST", "addresses:PUT" -> addressFields(false);
+            case "addresses:PATCH" -> addressFields(true);
+            case "cities:POST", "cities:PUT" -> cityFields(false);
+            case "cities:PATCH" -> cityFields(true);
+            case "customers:POST", "customers:PUT" -> customerFields(false);
+            case "customers:PATCH" -> customerFields(true);
+            case "films:POST", "films:PUT" -> filmFields(false);
+            case "films:PATCH" -> filmFields(true);
+            case "stores:POST", "stores:PUT" -> storeFields(false);
+            case "inventory:PATCH" -> List.of(
+                    fieldConfig("filmId", "number", true),
+                    fieldConfig("storeId", "number", true)
+            );
+            default -> defaultBodyFields(entity, endpoint);
         };
+    }
+
+    private List<FieldConfig> defaultBodyFields(EntityDefinition entity, EndpointDefinition endpoint) {
+        boolean partialBody = endpoint.method().equals("PATCH")
+                || endpoint.bodySchema().toLowerCase(Locale.ROOT).contains("patch");
+
+        List<String> fields = partialBody
+                ? entity.schemaFields().stream()
+                .filter(field -> !field.equals("id") && !field.equals("createDate") && !field.equals("lastUpdate"))
+                .toList()
+                : entity.schemaFields();
 
         return fields.stream()
-                .map(field -> fieldConfig(field, inferFieldType(field), false))
+                .map(field -> fieldConfig(field, inferFieldType(field), partialBody))
                 .toList();
+    }
+
+    private List<FieldConfig> addressFields(boolean partial) {
+        return List.of(
+                fieldConfig("address", "text", partial),
+                fieldConfig("address2", "text", true),
+                fieldConfig("district", "text", partial),
+                fieldConfig("postalCode", "text", partial),
+                fieldConfig("phone", "text", partial),
+                fieldConfig("city", "text", partial),
+                fieldConfig("country", "text", partial)
+        );
+    }
+
+    private List<FieldConfig> cityFields(boolean partial) {
+        return List.of(
+                fieldConfig("city", "text", partial),
+                fieldConfig("country", "text", partial)
+        );
+    }
+
+    private List<FieldConfig> customerFields(boolean partial) {
+        return List.of(
+                fieldConfig("firstName", "text", partial),
+                fieldConfig("lastName", "text", partial),
+                fieldConfig("email", "email", true),
+                fieldConfig("storeId", "number", partial),
+                fieldConfig("active", "boolean", true),
+                fieldConfig("address", "text", partial),
+                fieldConfig("address2", "text", true),
+                fieldConfig("district", "text", partial),
+                fieldConfig("postalCode", "text", partial),
+                fieldConfig("phone", "text", partial),
+                fieldConfig("city", "text", partial),
+                fieldConfig("country", "text", partial)
+        );
+    }
+
+    private List<FieldConfig> filmFields(boolean partial) {
+        return List.of(
+                fieldConfig("title", "text", partial),
+                fieldConfig("description", "text", true),
+                fieldConfig("releaseYear", "number", true),
+                fieldConfig("language", "text", partial),
+                fieldConfig("categories", "list", partial),
+                fieldConfig("actors", "list", partial),
+                fieldConfig("rentalDuration", "number", true),
+                fieldConfig("rentalRate", "decimal", true),
+                fieldConfig("length", "number", true),
+                fieldConfig("replacementCost", "decimal", true),
+                fieldConfig("rating", "text", true),
+                fieldConfig("specialFeatures", "list", true)
+        );
+    }
+
+    private List<FieldConfig> storeFields(boolean partial) {
+        return List.of(
+                fieldConfig("managerStaffId", "number", partial),
+                fieldConfig("address", "text", partial),
+                fieldConfig("address2", "text", true),
+                fieldConfig("district", "text", partial),
+                fieldConfig("postalCode", "text", partial),
+                fieldConfig("phone", "text", partial),
+                fieldConfig("city", "text", partial),
+                fieldConfig("country", "text", partial)
+        );
     }
 
     private FieldConfig fieldConfig(String field, String type, boolean optional) {
@@ -499,17 +463,6 @@ public class EntityUIController {
         };
     }
 
-    private String prettyBody(String body) {
-        if (body == null || body.isBlank()) {
-            return "";
-        }
-        try {
-            return objectMapper.readTree(body).toPrettyString();
-        } catch (JsonProcessingException ex) {
-            return body;
-        }
-    }
-
     private record PreviewData(
             List<String> columns,
             List<Map<String, Object>> rows,
@@ -521,23 +474,7 @@ public class EntityUIController {
     ) {
     }
 
-    public record ApiExplorerRequest(String method, String path, String body) {
-    }
-
-    public record ApiExplorerResponse(
-            int status,
-            String method,
-            String path,
-            String body,
-            Map<String, List<String>> headers,
-            String error
-    ) {
-        public static ApiExplorerResponse error(int status, String errorMessage) {
-            return new ApiExplorerResponse(status, null, null, null, Map.of(), errorMessage);
-        }
-    }
-
-    public record FieldConfig(
+    private record FieldConfig(
             String name,
             String label,
             String type,

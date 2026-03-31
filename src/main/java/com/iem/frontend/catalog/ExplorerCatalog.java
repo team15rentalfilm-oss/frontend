@@ -138,7 +138,7 @@ public final class ExplorerCatalog {
                 "mafuj",
                 "Manage address records and address-oriented search endpoints.",
                 "AddressRequestDTO",
-                List.of("address", "address2", "district", "cityId", "postalCode", "phone", "location"),
+                List.of("address", "address2", "district", "postalCode", "phone", "city", "country"),
                 "/api/addresses",
                 List.of(
                         endpoint("Create address", "POST", "/api/addresses", null, "AddressRequestDTO", "AddressDTO", "POST /api/addresses body: AddressRequestDTO -> AddressDTO"),
@@ -175,7 +175,7 @@ public final class ExplorerCatalog {
                 "mafuj",
                 "Maintain city reference data and city search endpoints.",
                 "CityRequestDTO",
-                List.of("city", "countryId"),
+                List.of("city", "country"),
                 "/api/cities",
                 List.of(
                         endpoint("Create city", "POST", "/api/cities", null, "CityRequestDTO", "CityDTO", "POST /api/cities body: CityRequestDTO -> CityDTO"),
@@ -211,7 +211,7 @@ public final class ExplorerCatalog {
                 "shreyash",
                 "View, search, create, and update customer records.",
                 "CustomerRequestDTO",
-                List.of("storeId", "firstName", "lastName", "email", "addressId", "active", "createDate"),
+                List.of("firstName", "lastName", "email", "storeId", "active", "address", "address2", "district", "postalCode", "phone", "city", "country"),
                 "/api/customers",
                 List.of(
                         endpoint("Create customer", "POST", "/api/customers", null, "CustomerRequestDTO", "CustomerDTO", "POST /api/customers body: CustomerRequestDTO -> CustomerDTO"),
@@ -234,7 +234,7 @@ public final class ExplorerCatalog {
                 "anwesha",
                 "Explore the film catalog, pagination, and search filters.",
                 "FilmRequestDTO",
-                List.of("title", "description", "releaseYear", "languageId", "originalLanguageId", "rentalDuration", "rentalRate", "length", "replacementCost", "rating", "specialFeatures", "categoryIds"),
+                List.of("title", "description", "releaseYear", "language", "categories", "actors", "rentalDuration", "rentalRate", "length", "replacementCost", "rating", "specialFeatures"),
                 "/api/films?page=0&size=100",
                 List.of(
                         endpoint("Create film", "POST", "/api/films", null, "FilmRequestDTO", "FilmDTO", "POST /api/films body: FilmRequestDTO -> FilmDTO"),
@@ -351,7 +351,7 @@ public final class ExplorerCatalog {
                 "shreyash",
                 "Maintain store records and manager assignments.",
                 "StoreRequestDTO",
-                List.of("managerStaffId", "addressId"),
+                List.of("managerStaffId", "address", "address2", "district", "postalCode", "phone", "city", "country"),
                 "/api/stores",
                 List.of(
                         endpoint("Create store", "POST", "/api/stores", null, "StoreRequestDTO", "StoreDTO", "POST /api/stores body: StoreRequestDTO -> StoreDTO"),
