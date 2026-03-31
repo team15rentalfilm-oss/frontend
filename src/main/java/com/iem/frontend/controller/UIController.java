@@ -6,6 +6,7 @@ import org.springframework.stereotype.Controller;
 import org.springframework.ui.Model;
 import org.springframework.web.bind.annotation.GetMapping;
 import org.springframework.web.bind.annotation.PathVariable;
+import org.springframework.web.bind.annotation.RequestParam;
 import org.springframework.web.server.ResponseStatusException;
 
 import static org.springframework.http.HttpStatus.NOT_FOUND;
@@ -33,5 +34,18 @@ public class UIController {
         model.addAttribute("baseUrl", ExplorerCatalog.BASE_API_URL);
         model.addAttribute("openApiPath", ExplorerCatalog.OPEN_API_PATH);
         return "member";
+    }
+
+    @GetMapping("/results")
+    public String resultsPage(
+            @RequestParam String title,
+            @RequestParam String method,
+            @RequestParam String path,
+            Model model
+    ) {
+        model.addAttribute("title", title);
+        model.addAttribute("method", method);
+        model.addAttribute("path", path);
+        return "results";
     }
 }

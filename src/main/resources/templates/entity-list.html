@@ -5,6 +5,12 @@
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
     <title th:text="${entity.displayName + ' - Film Rental Store'}">Entity</title>
     <style>
+        *,
+        *::before,
+        *::after {
+            box-sizing: border-box;
+        }
+
         body {
             margin: 0;
             font-family: "Segoe UI", Tahoma, sans-serif;
@@ -50,6 +56,8 @@
             border: 1px solid #22262e;
             border-radius: 14px;
             padding: 16px;
+            min-width: 0;
+            overflow: hidden;
         }
 
         .panel h2 {
@@ -90,6 +98,20 @@
             word-break: break-word;
         }
 
+        .endpoint-title {
+            display: block;
+            margin-bottom: 6px;
+            font-size: 0.95rem;
+            font-weight: 600;
+            color: #f3f4f6;
+        }
+
+        .endpoint-subtitle {
+            font-size: 0.84rem;
+            color: #9ca3af;
+            word-break: break-word;
+        }
+
         .content {
             display: grid;
             gap: 18px;
@@ -97,8 +119,9 @@
 
         .field-grid {
             display: grid;
-            grid-template-columns: repeat(auto-fit, minmax(180px, 1fr));
+            grid-template-columns: repeat(auto-fit, minmax(min(180px, 100%), 1fr));
             gap: 12px;
+            min-width: 0;
         }
 
         .field-group {
@@ -119,6 +142,7 @@
         label {
             display: grid;
             gap: 6px;
+            min-width: 0;
             font-size: 0.9rem;
             color: #d1d5db;
         }
@@ -126,6 +150,7 @@
         input,
         select {
             width: 100%;
+            max-width: 100%;
             padding: 10px 12px;
             border: 1px solid #2c313b;
             border-radius: 10px;
@@ -192,15 +217,9 @@
             min-height: 120px;
         }
 
-        .response-empty,
-        .preview-empty,
-        .preview-error {
+        .response-empty {
             color: #9ca3af;
             font-size: 0.95rem;
-        }
-
-        .preview-error {
-            color: #9d2b2b;
         }
 
         .response-stack {
@@ -415,92 +434,69 @@
         <h1 th:text="${entity.displayName}">Entity</h1>
         <p th:text="${entity.description}">Description</p>
         <p class="helper" th:if="${!#lists.isEmpty(entity.allowedSortFields)}"
-           th:text="${'Allowed sort fields: ' + entity.allowedSortFields}">
-            Allowed sort fields
+           th:text="${'You can sort this list by: ' + entity.allowedSortFields}">
+            You can sort this list by
         </p>
     </section>
 
     <section class="layout">
         <aside class="panel">
-            <h2>Endpoints</h2>
+            <h2>Actions</h2>
             <div class="endpoint-list" id="endpointList">
                 <article class="endpoint-card" th:each="endpoint, iter : ${entity.endpoints}" th:attr="data-index=${iter.index}">
                     <span class="endpoint-method" th:text="${endpoint.method}">GET</span>
-                    <p th:text="${endpoint.path}">/api/example</p>
+                    <strong class="endpoint-title" th:text="${endpoint.label}">Action</strong>
+                    <p class="endpoint-subtitle" th:text="${endpoint.path}">/api/example</p>
                 </article>
             </div>
         </aside>
 
         <div class="content">
             <section class="panel">
-                <h2>Request</h2>
+                <h2>Fill In Details</h2>
                 <label>
-                    Endpoint
+                    Choose an action
                     <select id="endpointSelect"></select>
                 </label>
 
                 <div id="pathSection" class="field-section" hidden>
-                    <h3>Path Parameters</h3>
+                    <h3>Main Details</h3>
                     <div id="pathFields" class="field-grid"></div>
                 </div>
 
                 <div id="querySection" class="field-section" hidden>
-                    <h3>Query Parameters</h3>
+                    <h3>More Options</h3>
                     <div id="queryFields" class="field-grid"></div>
                 </div>
 
                 <div id="bodySection" class="field-section" hidden>
-                    <h3>Body Fields</h3>
+                    <h3>Information To Save</h3>
                     <div id="bodyFields" class="field-grid"></div>
                 </div>
 
                 <p class="helper" id="endpointHelper"></p>
 
                 <div class="button-row">
-                    <button id="sendButton" class="primary" type="button">Send</button>
-                    <button id="resetButton" type="button">Reset</button>
+                    <button id="sendButton" class="primary" type="button">Run</button>
+                    <button id="resetButton" type="button">Clear</button>
                 </div>
             </section>
 
             <section class="panel">
-                <h2>Response</h2>
-                <span id="statusBadge" class="status">Waiting</span>
+                <h2>Result</h2>
+                <span id="statusBadge" class="status">Ready</span>
                 <div id="responseOutput" class="response-box" style="margin-top: 14px;">
-                    <div class="response-empty">No response yet.</div>
+                    <div class="response-empty">Your result will appear here.</div>
                 </div>
             </section>
 
-            <section class="panel">
-                <h2>Preview</h2>
-                <div th:if="${previewError != null}" class="preview-error" th:text="${previewError}">Preview error</div>
-                <div th:if="${previewError == null and #lists.isEmpty(previewRows)}" class="preview-empty">No records found.</div>
-                <div th:if="${previewError == null and previewHasPagination}" class="pagination-row" style="margin-bottom: 14px;">
-                    <a th:classappend="${!previewHasPrevious} ? ' disabled'" class="pager" th:href="${previewPreviousUrl}">Previous page</a>
-                    <span class="response-pill" th:text="${'Page ' + previewPageNumber + ' of ' + previewTotalPages}">Page 1 of 1</span>
-                    <span class="response-pill" th:text="${'Total records ' + previewTotalElements}">Total records 0</span>
-                    <a th:classappend="${!previewHasNext} ? ' disabled'" class="pager" th:href="${previewNextUrl}">Next page</a>
-                </div>
-                <div th:if="${previewError == null and !#lists.isEmpty(previewRows)}" class="table-wrap">
-                    <table>
-                        <thead>
-                        <tr>
-                            <th th:each="column : ${previewColumns}" th:text="${column}">column</th>
-                        </tr>
-                        </thead>
-                        <tbody>
-                        <tr th:each="row : ${previewRows}">
-                            <td th:each="column : ${previewColumns}" th:text="${row[column]}">value</td>
-                        </tr>
-                        </tbody>
-                    </table>
-                </div>
-            </section>
         </div>
     </section>
 </main>
 
 <script th:inline="javascript">
     const entityKey = /*[[${entity.key}]]*/ "";
+    const entityDisplayName = /*[[${entity.displayName}]]*/ "Items";
     const endpointConfigs = JSON.parse(/*[[${endpointConfigsJson}]]*/ "[]");
     const endpointSelect = document.getElementById("endpointSelect");
     const endpointCards = Array.from(document.querySelectorAll(".endpoint-card"));
@@ -521,12 +517,107 @@
     const expandedPagingEntities = new Set(["films", "staff", "payments", "rentals"]);
     const strictRequestEntities = new Set(["addresses", "cities", "customers", "films", "stores"]);
     const entityRequestHints = {
-        addresses: "Send nested city and country values. PUT requires the full body.",
-        cities: "Send country as a nested object. PUT requires the full body.",
-        customers: "Send storeId and a nested address object. PUT requires the full body.",
-        films: "Send language as text plus categories and actors as string lists. PUT requires the full body.",
-        stores: "Send managerStaffId and a nested address object. PUT requires the full body."
+        addresses: "Include the city and country details too. For a full update, fill in every field.",
+        cities: "Include the country details too. For a full update, fill in every field.",
+        customers: "Include the store number and full address details. For a full update, fill in every field.",
+        films: "Enter the language name, plus category and actor names separated by commas. For a full update, fill in every field.",
+        stores: "Include the manager staff number and full address details. For a full update, fill in every field."
     };
+
+    function singularizeLabel(value) {
+        if (!value) {
+            return "item";
+        }
+        if (value.endsWith("ies")) {
+            return value.slice(0, -3) + "y";
+        }
+        if (value.endsWith("s")) {
+            return value.slice(0, -1);
+        }
+        return value;
+    }
+
+    function entitySingularLower() {
+        return singularizeLabel(entityDisplayName).toLowerCase();
+    }
+
+    function entityPluralLower() {
+        return entityDisplayName.toLowerCase();
+    }
+
+    function buildFriendlyActionTitle(endpoint) {
+        const label = (endpoint.label || "").toLowerCase();
+        const singular = entitySingularLower();
+        const plural = entityPluralLower();
+
+        if (label.startsWith("create")) {
+            return `Create a new ${singular}`;
+        }
+        if (label.startsWith("list")) {
+            return `See all ${plural}`;
+        }
+        if (label.startsWith("get") && label.includes("details")) {
+            return `View ${singular} details`;
+        }
+        if (label.startsWith("get") && label.includes(" by id")) {
+            return `View ${singular} by ID`;
+        }
+        if (label.startsWith("search")) {
+            return label.replace(/^search/i, "Find").replace(/^./, (match) => match.toUpperCase());
+        }
+        if (label.startsWith("filter")) {
+            return label.replace(/^filter/i, "Find by").replace(/^./, (match) => match.toUpperCase());
+        }
+        if (label.startsWith("replace")) {
+            return `Replace this ${singular}`;
+        }
+        if (label.startsWith("patch")) {
+            return `Update part of this ${singular}`;
+        }
+        if (label.startsWith("mark rental returned")) {
+            return "Mark a rental as returned";
+        }
+        return endpoint.label || `${endpoint.method} ${endpoint.path}`;
+    }
+
+    function simplifyNotes(endpoint) {
+        const notes = endpoint.notes || "";
+        if (!notes) {
+            return "";
+        }
+
+        return notes
+            .replace(/Replace \{[^}]+\} with /i, "Enter the ")
+            .replace(/an /i, "")
+            .replace(/a /i, "")
+            .replace(/ id\./i, " ID number.")
+            .replace(/Provide /i, "Enter ")
+            .replace(/Use any combination of /i, "You can enter any of these: ")
+            .replace(/Use /i, "You can use ");
+    }
+
+    function buildActionHelperText(endpoint) {
+        const parts = [];
+
+        if (isPagedEndpoint(endpoint)) {
+            parts.push(`${defaultPageSize(endpoint)} items are shown on each page.`);
+        }
+
+        const notes = simplifyNotes(endpoint);
+        if (notes) {
+            parts.push(notes);
+        }
+
+        if (endpoint.bodyFields && endpoint.bodyFields.length && strictRequestEntities.has(entityKey)) {
+            parts.push(entityRequestHints[entityKey]);
+        }
+
+        return parts.join(" ");
+    }
+
+    function shouldOpenResultsInNewTab(endpoint) {
+        return endpoint.method === "GET" && buildFriendlyActionTitle(endpoint).startsWith("See all ");
+    }
 
     function isManagedQueryField(fieldName) {
         return fieldName === "page" || fieldName === "size" || fieldName === "sort";
@@ -598,14 +689,7 @@
         renderFields(queryFields, querySection, endpoint.queryFields || [], "query");
         renderFields(bodyFields, bodySection, endpoint.bodyFields || [], "body");
 
-        const hasAutomaticPaging = isPagedEndpoint(endpoint);
-        const helperText = hasAutomaticPaging
-            ? (endpoint.displayLine || endpoint.path) + " | " + defaultPageSize(endpoint) + " records are loaded per page."
-            : (endpoint.displayLine || endpoint.path);
-        const hint = endpoint.bodyFields && endpoint.bodyFields.length && strictRequestEntities.has(entityKey)
-            ? entityRequestHints[entityKey]
-            : "";
-        endpointHelper.textContent = hint ? helperText + " | " + hint : helperText;
+        endpointHelper.textContent = buildActionHelperText(endpoint);
     }
 
     function getFieldValues(container) {
@@ -911,11 +995,61 @@
         return Array.isArray(parsed) || isObjectLike(parsed);
     }
 
+    function orderColumns(columns) {
+        const priority = [
+            "actorId",
+            "addressId",
+            "categoryId",
+            "cityId",
+            "countryId",
+            "customerId",
+            "filmId",
+            "inventoryId",
+            "languageId",
+            "paymentId",
+            "rentalId",
+            "staffId",
+            "storeId",
+            "id",
+            "country",
+            "city",
+            "name",
+            "title",
+            "firstName",
+            "lastName"
+        ];
+
+        return [...columns].sort((left, right) => {
+            const leftPriority = priority.indexOf(left);
+            const rightPriority = priority.indexOf(right);
+
+            if (leftPriority !== -1 || rightPriority !== -1) {
+                if (leftPriority === -1) {
+                    return 1;
+                }
+                if (rightPriority === -1) {
+                    return -1;
+                }
+                return leftPriority - rightPriority;
+            }
+
+            const leftIsId = /id$/i.test(left);
+            const rightIsId = /id$/i.test(right);
+            if (leftIsId !== rightIsId) {
+                return leftIsId ? -1 : 1;
+            }
+
+            return left.localeCompare(right);
+        });
+    }
+
     function collectColumns(data) {
-        return Array.from(data.reduce((set, item) => {
+        const columns = Array.from(data.reduce((set, item) => {
             Object.keys(item || {}).forEach((key) => set.add(key));
             return set;
         }, new Set()));
+
+        return orderColumns(columns);
     }
 
     function pickCardTitle(row) {
@@ -1038,7 +1172,7 @@
             <div class="pagination-row">
                 <button type="button" data-page-target="${pagination.page - 1}" ${pagination.page <= 0 ? "disabled" : ""}>Previous page</button>
                 <span class="response-pill">Page ${pagination.page + 1} of ${pagination.totalPages}</span>
-                <span class="response-pill">Total records ${pagination.totalElements}</span>
+                <span class="response-pill">Total items ${pagination.totalElements}</span>
                 <button type="button" data-page-target="${pagination.page + 1}" ${pagination.page + 1 >= pagination.totalPages ? "disabled" : ""}>Next page</button>
                 ${showExpandedPagingButton ? `<button type="button" data-page-target="${nextPageByHundred}" data-size-target="${nextSizeByHundred}">Next +100</button>` : ""}
             </div>
@@ -1203,23 +1337,22 @@
     }
 
     function renderObjectTable(data, depth = 0) {
-        const columns = Object.keys(data || {});
+        const columns = orderColumns(Object.keys(data || {}));
         if (!columns.length) {
-            return '<div class="response-empty">No data returned.</div>';
+            return '<div class="response-empty">Nothing to show.</div>';
         }
 
         return `
-            <div class="table-wrap">
-                <table>
-                    <thead>
-                        <tr>${columns.map((column) => `<th>${escapeHtml(normalizeLabel(column))}</th>`).join("")}</tr>
-                    </thead>
-                    <tbody>
-                        <tr>
-                            ${columns.map((column) => `<td>${renderValue(data[column], depth + 1)}</td>`).join("")}
-                        </tr>
-                    </tbody>
-                </table>
+            <div class="response-stack">
+                ${renderSummary(["Showing 1 item"])}
+                <div class="detail-grid">
+                    ${columns.map((column) => `
+                        <div class="detail-card">
+                            <strong>${escapeHtml(normalizeLabel(column))}</strong>
+                            ${renderValue(data[column], depth + 1)}
+                        </div>
+                    `).join("")}
+                </div>
             </div>
         `;
     }
@@ -1302,7 +1435,7 @@
 
         const entries = Object.entries(data || {});
         if (!entries.length) {
-            return '<div class="response-empty">No data returned.</div>';
+            return '<div class="response-empty">Nothing to show.</div>';
         }
 
         return renderObjectTable(data, depth);
@@ -1310,7 +1443,7 @@
 
     function renderArray(data, depth = 0) {
         if (!data.length) {
-            return '<div class="response-empty">No records found.</div>';
+            return '<div class="response-empty">No matching items found.</div>';
         }
 
         if (typeof data[0] !== "object" || data[0] === null || Array.isArray(data[0])) {
@@ -1358,7 +1491,7 @@
     function renderResponseBody(body, status) {
         responsePagination = null;
         if (!body) {
-            responseOutput.innerHTML = '<div class="response-empty">Request completed.</div>';
+            responseOutput.innerHTML = '<div class="response-empty">Done.</div>';
             return;
         }
 
@@ -1367,7 +1500,7 @@
             const friendlyError = getFriendlyError(parsed);
             if (status >= 400 && friendlyError) {
                 renderFriendlyError(
-                    "The API could not complete this request.",
+                    "We could not complete this action.",
                     friendlyError,
                     getBackendGuidance(friendlyError)
                 );
@@ -1386,7 +1519,7 @@
         } catch (error) {
             responseOutput.innerHTML = `
                 <div class="message-card">
-                    <strong>Response received</strong>
+                    <strong>Result received</strong>
                     <p>${escapeHtml(body)}</p>
                 </div>
             `;
@@ -1395,9 +1528,9 @@
 
     async function executePayload(payload) {
         lastRequestPayload = payload;
-        setStatus("Loading", "");
+        setStatus("Working", "");
         responsePagination = null;
-        responseOutput.innerHTML = '<div class="response-empty">Loading...</div>';
+        responseOutput.innerHTML = '<div class="response-empty">Working on it...</div>';
 
         try {
             const response = await fetch("/ui/api-explorer/execute", {
@@ -1408,28 +1541,41 @@
 
             const result = await response.json();
             if (result.error) {
-                setStatus("Needs attention", "error");
+                setStatus("Check details", "error");
                 renderFriendlyError(
-                    "The request could not be sent.",
-                    result.error || "Please check the path parameters, filters, and backend availability."
+                    "We could not send this action.",
+                    result.error || "Please check the details you entered and try again."
                 );
                 return;
             }
 
-            setStatus(result.status >= 200 && result.status < 300 ? "Success" : "Needs attention", result.status >= 200 && result.status < 300 ? "ok" : "error");
+            setStatus(result.status >= 200 && result.status < 300 ? "Done" : "Check details", result.status >= 200 && result.status < 300 ? "ok" : "error");
             renderResponseBody(result.body, result.status);
         } catch (error) {
-            setStatus("Needs attention", "error");
+            setStatus("Unavailable", "error");
             renderFriendlyError(
-                "We could not reach the API.",
-                error.message || "The backend may be unavailable right now."
+                "We could not connect right now.",
+                error.message || "The service may be temporarily unavailable."
             );
         }
     }
 
     endpointConfigs.forEach((endpoint, index) => {
-        const option = new Option(endpoint.method + " " + endpoint.path, String(index));
+        const option = new Option(buildFriendlyActionTitle(endpoint), String(index));
         endpointSelect.add(option);
+    });
+
+    endpointCards.forEach((card, index) => {
+        const endpoint = endpointConfigs[index];
+        const title = card.querySelector(".endpoint-title");
+        const subtitle = card.querySelector(".endpoint-subtitle");
+
+        if (endpoint && title) {
+            title.textContent = buildFriendlyActionTitle(endpoint);
+        }
+        if (endpoint && subtitle) {
+            subtitle.textContent = endpoint.method + " " + endpoint.path;
+        }
     });
 
     endpointCards.forEach((card, index) => {
@@ -1464,10 +1610,19 @@
                 path: buildPath(endpoint) + buildQuery(endpoint),
                 body: buildBody(endpoint)
             };
+            if (shouldOpenResultsInNewTab(endpoint)) {
+                const params = new URLSearchParams({
+                    title: buildFriendlyActionTitle(endpoint),
+                    method: payload.method,
+                    path: payload.path
+                });
+                window.open("/results?" + params.toString(), "_blank", "noopener");
+                return;
+            }
             executePayload(payload);
         } catch (error) {
-            setStatus("Needs attention", "error");
-            renderFriendlyError("The request body is incomplete.", error.message || "Check the required fields and try again.");
+            setStatus("Check details", "error");
+            renderFriendlyError("Some information is missing.", error.message || "Please fill in the required fields and try again.");
         }
     });
 

@@ -7,7 +7,7 @@ import java.util.Map;
 
 public final class ExplorerCatalog {
 
-    public static final String BASE_API_URL = "http://localhost:8081";
+    public static final String BASE_API_URL = "http://localhost:8089";
     public static final String OPEN_API_PATH = "/v3/api-docs";
 
     private static final Map<String, MemberDefinition> MEMBERS = buildMembers();

@@ -3,13 +3,12 @@ package com.iem.frontend.controller;
 import org.springframework.stereotype.Controller;
 import org.springframework.ui.Model;
 import org.springframework.web.bind.annotation.GetMapping;
-import org.springframework.web.bind.annotation.RequestParam;
 
 @Controller
 public class InventoryEntityController extends BaseEntityPageController {
 
     @GetMapping({"/entities/inventory", "/inventory", "/inventories"})
-    public String view(@RequestParam(name = "previewPage", defaultValue = "0") int previewPage, Model model) {
-        return renderEntityPage("inventory", previewPage, model);
+    public String view(Model model) {
+        return renderEntityPage("inventory", model);
     }
 }
