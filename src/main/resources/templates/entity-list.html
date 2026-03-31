@@ -500,6 +500,7 @@
 </main>
 
 <script th:inline="javascript">
+    const entityKey = /*[[${entity.key}]]*/ "";
     const endpointConfigs = JSON.parse(/*[[${endpointConfigsJson}]]*/ "[]");
     const endpointSelect = document.getElementById("endpointSelect");
     const endpointCards = Array.from(document.querySelectorAll(".endpoint-card"));
@@ -517,6 +518,7 @@
     let selectedIndex = 0;
     let lastRequestPayload = null;
     let responsePagination = null;
+    const expandedPagingEntities = new Set(["films", "staff", "payments", "rentals"]);
 
     function isManagedQueryField(fieldName) {
         return fieldName === "page" || fieldName === "size" || fieldName === "sort";
@@ -526,8 +528,12 @@
         return (endpoint.queryFields || []).some((field) => field.name === "page" || field.name === "size");
     }
 
+    function usesExpandedPaging(endpoint = endpointConfigs[selectedIndex]) {
+        return expandedPagingEntities.has(entityKey) && isPagedEndpoint(endpoint);
+    }
+
     function defaultPageSize(endpoint) {
-        return endpoint.path.includes("/api/films") ? 12 : 12;
+        return usesExpandedPaging(endpoint) ? 100 : 12;
     }
 
     function createInput(field, prefix) {
@@ -842,23 +848,27 @@
             return "";
         }
 
+        const showExpandedPagingButton = usesExpandedPaging(endpointConfigs[selectedIndex]);
+        const nextPageByHundred = pagination.page + 100;
+        const nextSizeByHundred = pagination.size + 100;
+
         return `
             <div class="pagination-row">
                 <button type="button" data-page-target="${pagination.page - 1}" ${pagination.page <= 0 ? "disabled" : ""}>Previous page</button>
                 <span class="response-pill">Page ${pagination.page + 1} of ${pagination.totalPages}</span>
                 <span class="response-pill">Total records ${pagination.totalElements}</span>
                 <button type="button" data-page-target="${pagination.page + 1}" ${pagination.page + 1 >= pagination.totalPages ? "disabled" : ""}>Next page</button>
+                ${showExpandedPagingButton ? `<button type="button" data-page-target="${nextPageByHundred}" data-size-target="${nextSizeByHundred}">Next +100</button>` : ""}
             </div>
         `;
     }
 
-    function updatePageInPath(path, nextPage) {
+    function updatePageInPath(path, nextPage, nextSize) {
         const [basePath, queryString = ""] = path.split("?");
         const params = new URLSearchParams(queryString);
+        const resolvedSize = nextSize ?? responsePagination?.size ?? defaultPageSize(endpointConfigs[selectedIndex]);
         params.set("page", String(Math.max(nextPage, 0)));
-        if (!params.has("size")) {
-            params.set("size", String(responsePagination?.size || defaultPageSize(endpointConfigs[selectedIndex])));
-        }
+        params.set("size", String(resolvedSize));
         return `${basePath}?${params.toString()}`;
     }
 
@@ -1174,9 +1184,10 @@
         }
 
         const nextPage = Number(trigger.dataset.pageTarget);
+        const nextSize = trigger.dataset.sizeTarget ? Number(trigger.dataset.sizeTarget) : undefined;
         executePayload({
             ...lastRequestPayload,
-            path: updatePageInPath(lastRequestPayload.path, nextPage)
+            path: updatePageInPath(lastRequestPayload.path, nextPage, nextSize)
         });
     });
 

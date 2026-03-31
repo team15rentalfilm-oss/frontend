@@ -246,7 +246,7 @@ public class EntityUIController {
     }
 
     private String resolvePreviewPath(String collectionPath, int previewPage) {
-        UriComponentsBuilder builder = UriComponentsBuilder.fromPath(collectionPath);
+        UriComponentsBuilder builder = UriComponentsBuilder.fromUriString(collectionPath);
         if (collectionPath.contains("page=")) {
             builder.replaceQueryParam("page", previewPage);
         }
@@ -491,7 +491,6 @@ public class EntityUIController {
 
     private String placeholderFor(String field, String type) {
         return switch (type) {
-            case "number" -> "Enter " + field;
             case "decimal" -> "0.00";
             case "datetime" -> "2026-03-28T00:00:00";
             case "email" -> "name@example.com";
