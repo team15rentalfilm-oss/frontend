@@ -812,7 +812,10 @@
 
         const city = {};
         includeIfPresent(city, "city", values.city);
-        includeIfPresent(city, "country", values.country);
+        // Backend expects `country` to be a CountryRequestDTO object, not a plain string.
+        if (!isEmptyValue(values.country)) {
+            city.country = { country: values.country };
+        }
         return Object.keys(city).length ? city : null;
     }
 
@@ -850,7 +853,10 @@
 
         const body = {};
         includeIfPresent(body, "city", values.city);
-        includeIfPresent(body, "country", values.country);
+        // Backend expects `country` to be a CountryRequestDTO object, not a plain string.
+        if (!isEmptyValue(values.country)) {
+            body.country = { country: values.country };
+        }
         return Object.keys(body).length ? JSON.stringify(body) : "";
     }
 
@@ -993,8 +999,8 @@
 
     function orderColumns(columns) {
         const priority = [
-            "actorId",
             "addressId",
+            "actorId",
             "categoryId",
             "cityId",
             "countryId",
@@ -1007,12 +1013,12 @@
             "staffId",
             "storeId",
             "id",
-            "country",
-            "city",
             "name",
             "title",
             "firstName",
-            "lastName"
+            "lastName",
+            "city",
+            "country"
         ];
 
         return [...columns].sort((left, right) => {
@@ -1040,6 +1046,13 @@
     }
 
     function collectColumns(data) {
+        if (data.some((row) => isAddressLikeRow(row))) {
+            const normalizedRows = data.map((row) => normalizeAddressTableRow(row));
+            return addressTableColumns.filter((column) =>
+                normalizedRows.some((row) => !isEmptyValue(row[column]))
+            );
+        }
+
         const columns = Array.from(data.reduce((set, item) => {
             Object.keys(item || {}).forEach((key) => set.add(key));
             return set;
@@ -1266,6 +1279,25 @@
         `;
     }
 
+    function summarizeNestedLabel(value) {
+        if (!value || typeof value !== "object" || Array.isArray(value)) {
+            return value;
+        }
+        if (value.city !== undefined && value.city !== null && value.city !== "") {
+            return summarizeNestedLabel(value.city);
+        }
+        if (value.country !== undefined && value.country !== null && value.country !== "") {
+            return summarizeNestedLabel(value.country);
+        }
+        if (value.name !== undefined && value.name !== null && value.name !== "") {
+            return summarizeNestedLabel(value.name);
+        }
+        if (value.title !== undefined && value.title !== null && value.title !== "") {
+            return summarizeNestedLabel(value.title);
+        }
+        return value;
+    }
+
     function summarizeObjectForTable(value) {
         if (!value || typeof value !== "object" || Array.isArray(value)) {
             return value;
@@ -1277,11 +1309,11 @@
         if (value.name !== undefined && value.name !== null && value.name !== "") {
             return value.name;
         }
-        if (value.country !== undefined && value.country !== null && value.country !== "") {
-            return value.country;
-        }
         if (value.city !== undefined && value.city !== null && value.city !== "") {
-            return value.city;
+            return summarizeNestedLabel(value.city);
+        }
+        if (value.country !== undefined && value.country !== null && value.country !== "") {
+            return summarizeNestedLabel(value.country);
         }
         if ((value.firstName || value.lastName) && (value.firstName !== undefined || value.lastName !== undefined)) {
             return [value.firstName, value.lastName].filter(Boolean).join(" ");
@@ -1325,9 +1357,39 @@
         return parsed;
     }
 
+    const addressTableColumns = ["addressId", "cityId", "address", "address2", "district", "phone", "postalCode", "city", "country"];
+
+    function isAddressLikeRow(row) {
+        return !!row
+            && typeof row === "object"
+            && !Array.isArray(row)
+            && ("address" in row || "address2" in row || "district" in row || "postalCode" in row || "phone" in row)
+            && ("city" in row || "cityId" in row || "addressId" in row || "id" in row);
+    }
+
+    function normalizeAddressTableRow(row) {
+        const parsedCity = safeParseJson(row ? row.city : null);
+        const cityObject = parsedCity && typeof parsedCity === "object" && !Array.isArray(parsedCity) ? parsedCity : null;
+        const cityValue = cityObject && cityObject.city !== undefined ? cityObject.city : (row ? row.city : null);
+        const countryValue = row && row.country !== undefined ? row.country : (cityObject ? cityObject.country : null);
+
+        return {
+            addressId: row?.addressId ?? row?.id ?? null,
+            cityId: row?.cityId ?? (cityObject ? (cityObject.cityId ?? cityObject.id) : null),
+            address: row?.address ?? null,
+            address2: row?.address2 ?? null,
+            district: row?.district ?? null,
+            phone: row?.phone ?? null,
+            postalCode: row?.postalCode ?? null,
+            city: summarizeTableValue(cityValue),
+            country: summarizeTableValue(countryValue)
+        };
+    }
+
     function normalizeTableRow(row, columns) {
+        const sourceRow = isAddressLikeRow(row) ? normalizeAddressTableRow(row) : row;
         return columns.reduce((normalized, column) => {
-            normalized[column] = summarizeTableValue(row ? row[column] : null);
+            normalized[column] = summarizeTableValue(sourceRow ? sourceRow[column] : null);
             return normalized;
         }, {});
     }

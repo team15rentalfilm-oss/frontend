@@ -236,11 +236,11 @@
         if (!value || typeof value !== "object" || Array.isArray(value)) {
             return value;
         }
-        if (value.country) {
-            return value.country;
-        }
         if (value.city) {
-            return value.city;
+            return summarizeObject(value.city);
+        }
+        if (value.country) {
+            return summarizeObject(value.country);
         }
         if (value.name) {
             return value.name;
@@ -271,10 +271,43 @@
         return parsed;
     }
 
+    const addressTableColumns = ["addressId", "cityId", "address", "address2", "district", "phone", "postalCode", "city", "country"];
+
+    function isEmptyValue(value) {
+        return value === null || value === undefined || value === "" || (Array.isArray(value) && !value.length);
+    }
+
+    function isAddressLikeRow(row) {
+        return !!row
+            && typeof row === "object"
+            && !Array.isArray(row)
+            && ("address" in row || "address2" in row || "district" in row || "postalCode" in row || "phone" in row)
+            && ("city" in row || "cityId" in row || "addressId" in row || "id" in row);
+    }
+
+    function normalizeAddressTableRow(row) {
+        const parsedCity = safeParseJson(row ? row.city : null);
+        const cityObject = parsedCity && typeof parsedCity === "object" && !Array.isArray(parsedCity) ? parsedCity : null;
+        const cityValue = cityObject && cityObject.city !== undefined ? cityObject.city : (row ? row.city : null);
+        const countryValue = row && row.country !== undefined ? row.country : (cityObject ? cityObject.country : null);
+
+        return {
+            addressId: row?.addressId ?? row?.id ?? null,
+            cityId: row?.cityId ?? (cityObject ? (cityObject.cityId ?? cityObject.id) : null),
+            address: row?.address ?? null,
+            address2: row?.address2 ?? null,
+            district: row?.district ?? null,
+            phone: row?.phone ?? null,
+            postalCode: row?.postalCode ?? null,
+            city: summarizeValue(cityValue),
+            country: summarizeValue(countryValue)
+        };
+    }
+
     function orderColumns(columns) {
         const priority = [
-            "actorId",
             "addressId",
+            "actorId",
             "categoryId",
             "cityId",
             "countryId",
@@ -287,12 +320,12 @@
             "staffId",
             "storeId",
             "id",
-            "country",
-            "city",
             "name",
             "title",
             "firstName",
-            "lastName"
+            "lastName",
+            "city",
+            "country"
         ];
 
         return [...columns].sort((left, right) => {
@@ -320,6 +353,13 @@
     }
 
     function collectColumns(data) {
+        if (data.some((row) => isAddressLikeRow(row))) {
+            const normalizedRows = data.map((row) => normalizeAddressTableRow(row));
+            return addressTableColumns.filter((column) =>
+                normalizedRows.some((row) => !isEmptyValue(row[column]))
+            );
+        }
+
         const columns = Array.from(data.reduce((set, item) => {
             Object.keys(item || {}).forEach((key) => set.add(key));
             return set;
@@ -364,6 +404,7 @@
         }
 
         const columns = collectColumns(data);
+        const normalizedRows = data.map((row) => isAddressLikeRow(row) ? normalizeAddressTableRow(row) : row);
         return `
             <div class="table-wrap">
                 <table>
@@ -371,7 +412,7 @@
                         <tr>${columns.map((column) => `<th>${escapeHtml(normalizeLabel(column))}</th>`).join("")}</tr>
                     </thead>
                     <tbody>
-                        ${data.map((row) => `
+                        ${normalizedRows.map((row) => `
                             <tr>
                                 ${columns.map((column) => `<td>${escapeHtml(formatValue(summarizeValue(row ? row[column] : null)))}</td>`).join("")}
                             </tr>
