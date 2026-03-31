@@ -328,7 +328,7 @@ public final class ExplorerCatalog {
                 "utsav",
                 "Manage staff records with pagination, search, and location filters.",
                 "StaffRequestDTO",
-                List.of("firstName", "lastName", "addressId", "email", "storeId", "active", "username", "password", "picture"),
+                List.of("firstName", "lastName", "email", "storeId", "active", "username", "password", "picture", "address", "address2", "district", "postalCode", "phone", "city", "country"),
                 "/api/staff?page=0&size=100",
                 List.of(
                         endpoint("Create staff", "POST", "/api/staff", null, "StaffRequestDTO", "StaffDTO", "POST /api/staff body: StaffRequestDTO -> StaffDTO"),

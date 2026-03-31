@@ -105,6 +105,8 @@ abstract class BaseEntityPageController {
             case "customers:PATCH" -> customerFields(true);
             case "films:POST", "films:PUT" -> filmFields(false);
             case "films:PATCH" -> filmFields(true);
+            case "staff:POST", "staff:PUT" -> staffFields(false);
+            case "staff:PATCH" -> staffFields(true);
             case "stores:POST", "stores:PUT" -> storeFields(false);
             case "inventory:PATCH" -> List.of(
                     fieldConfig("filmId", "number", true),
@@ -179,6 +181,26 @@ abstract class BaseEntityPageController {
                 fieldConfig("replacementCost", "decimal", true),
                 fieldConfig("rating", "text", true),
                 fieldConfig("specialFeatures", "list", true)
+        );
+    }
+
+    private List<FieldConfig> staffFields(boolean partial) {
+        return List.of(
+                fieldConfig("firstName", "text", partial),
+                fieldConfig("lastName", "text", partial),
+                fieldConfig("email", "email", true),
+                fieldConfig("storeId", "number", partial),
+                fieldConfig("active", "boolean", true),
+                fieldConfig("username", "text", partial),
+                fieldConfig("password", "text", partial),
+                fieldConfig("picture", "text", true),
+                fieldConfig("address", "text", partial),
+                fieldConfig("address2", "text", true),
+                fieldConfig("district", "text", partial),
+                fieldConfig("postalCode", "text", partial),
+                fieldConfig("phone", "text", partial),
+                fieldConfig("city", "text", partial),
+                fieldConfig("country", "text", partial)
         );
     }
 
