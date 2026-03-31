@@ -515,12 +515,13 @@
     let lastRequestPayload = null;
     let responsePagination = null;
     const expandedPagingEntities = new Set(["films", "staff", "payments", "rentals"]);
-    const strictRequestEntities = new Set(["addresses", "cities", "customers", "films", "stores"]);
+    const strictRequestEntities = new Set(["addresses", "cities", "customers", "films", "staff", "stores"]);
     const entityRequestHints = {
         addresses: "Include the city and country details too. For a full update, fill in every field.",
         cities: "Include the country details too. For a full update, fill in every field.",
         customers: "Include the store number and full address details. For a full update, fill in every field.",
         films: "Enter the language name, plus category and actor names separated by commas. For a full update, fill in every field.",
+        staff: "Include the store number, login details, and full address details. For a full update, fill in every field.",
         stores: "Include the manager staff number and full address details. For a full update, fill in every field."
     };
 
@@ -928,6 +929,37 @@
         return Object.keys(body).length ? JSON.stringify(body) : "";
     }
 
+    function buildStaffBody(values, isPatch) {
+        if (!isPatch) {
+            requireFields(values, ["firstName", "lastName", "storeId", "username", "password", "address", "district", "postalCode", "phone", "city", "country"], {
+                storeId: "Store Id",
+                postalCode: "Postal Code"
+            });
+        }
+
+        const body = {};
+        includeIfPresent(body, "firstName", values.firstName);
+        includeIfPresent(body, "lastName", values.lastName);
+        includeIfPresent(body, "email", values.email);
+        includeIfPresent(body, "storeId", values.storeId);
+        includeIfPresent(body, "username", values.username);
+        includeIfPresent(body, "password", values.password);
+        includeIfPresent(body, "picture", values.picture);
+
+        if (isPatch) {
+            includeIfPresent(body, "active", values.active);
+        } else {
+            body.active = isEmptyValue(values.active) ? true : values.active;
+        }
+
+        const address = buildNestedAddress(values, !isPatch);
+        if (address) {
+            body.address = address;
+        }
+
+        return Object.keys(body).length ? JSON.stringify(body) : "";
+    }
+
     function buildStrictBody(endpoint, values, isPatch) {
         switch (entityKey) {
             case "addresses":
@@ -938,6 +970,8 @@
                 return buildCustomerBody(values, isPatch);
             case "films":
                 return buildFilmBody(values, isPatch);
+            case "staff":
+                return buildStaffBody(values, isPatch);
             case "stores":
                 return buildStoreBody(values, isPatch);
             default:
