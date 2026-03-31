@@ -260,9 +260,7 @@ public final class ExplorerCatalog {
                         endpoint("Get inventory by id", "GET", "/api/inventory/{id}", "Replace {id} with an inventory id.", null, "InventoryDTO", "GET /api/inventory/{id} -> InventoryDTO"),
                         endpoint("Get inventory details", "GET", "/api/inventory/{id}/details", "Replace {id} with an inventory id.", null, "InventoryDetailsDTO", "GET /api/inventory/{id}/details -> InventoryDetailsDTO"),
                         endpoint("Replace inventory", "PUT", "/api/inventory/{id}", "Replace {id} with an inventory id.", "InventoryRequestDTO", "InventoryDTO", "PUT /api/inventory/{id} body: InventoryRequestDTO -> InventoryDTO"),
-                        endpoint("Patch inventory", "PATCH", "/api/inventory/{id}", "Replace {id} with an inventory id.", "InventoryRequestDTO", "InventoryDTO", "PATCH /api/inventory/{id} body: InventoryRequestDTO -> InventoryDTO"),
-                        endpoint("List inventory by film", "GET", "/api/inventory/film/{filmId}?page=&size=&sort=", "Replace {filmId} and use page, size, or sort as needed.", null, "Page<InventoryDTO>", "GET /api/inventory/film/{filmId}?page=&size=&sort= -> Page<InventoryDTO>"),
-                        endpoint("List inventory by store", "GET", "/api/inventory/store/{storeId}?page=&size=&sort=", "Replace {storeId} and use page, size, or sort as needed.", null, "Page<InventoryDTO>", "GET /api/inventory/store/{storeId}?page=&size=&sort= -> Page<InventoryDTO>")
+                        endpoint("Patch inventory", "PATCH", "/api/inventory/{id}", "Replace {id} with an inventory id.", "InventoryRequestDTO", "InventoryDTO", "PATCH /api/inventory/{id} body: InventoryRequestDTO -> InventoryDTO")
                 )
         ));
 

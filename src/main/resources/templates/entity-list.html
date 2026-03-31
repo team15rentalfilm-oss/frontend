@@ -1422,19 +1422,26 @@
     }
 
     function normalizeAddressTableRow(row) {
-        const parsedCity = safeParseJson(row ? row.city : null);
+        const normalizedAddress = findAddressObject(
+            row?.address ?? row?.addressDto ?? row?.addressDTO ?? row?.storeAddress ?? row?.store_address
+        );
+        const parsedCity = safeParseJson(normalizedAddress ? normalizedAddress.city : (row ? row.city : null));
         const cityObject = parsedCity && typeof parsedCity === "object" && !Array.isArray(parsedCity) ? parsedCity : null;
-        const cityValue = cityObject && cityObject.city !== undefined ? cityObject.city : (row ? row.city : null);
-        const countryValue = row && row.country !== undefined ? row.country : (cityObject ? cityObject.country : null);
+        const cityValue = cityObject && cityObject.city !== undefined
+            ? cityObject.city
+            : (normalizedAddress ? normalizedAddress.city : (row ? row.city : null));
+        const countryValue = normalizedAddress && normalizedAddress.country !== undefined
+            ? normalizedAddress.country
+            : (row && row.country !== undefined ? row.country : (cityObject ? cityObject.country : null));
 
         return {
             addressId: row?.addressId ?? row?.id ?? null,
-            cityId: row?.cityId ?? (cityObject ? (cityObject.cityId ?? cityObject.id) : null),
-            address: row?.address ?? null,
-            address2: row?.address2 ?? null,
-            district: row?.district ?? null,
-            phone: row?.phone ?? null,
-            postalCode: row?.postalCode ?? null,
+            cityId: row?.cityId ?? normalizedAddress?.cityId ?? (cityObject ? (cityObject.cityId ?? cityObject.id) : null),
+            address: normalizedAddress ? normalizedAddress.address : row?.address ?? null,
+            address2: normalizedAddress ? normalizedAddress.address2 : row?.address2 ?? null,
+            district: normalizedAddress ? normalizedAddress.district : row?.district ?? null,
+            phone: normalizedAddress ? normalizedAddress.phone : row?.phone ?? null,
+            postalCode: normalizedAddress ? normalizedAddress.postalCode : row?.postalCode ?? null,
             city: summarizeTableValue(cityValue),
             country: summarizeTableValue(countryValue)
         };
@@ -1454,9 +1461,9 @@
             return '<div class="response-empty">Nothing to show.</div>';
         }
 
-        const specialCustomerAddresses = depth === 0 ? renderCustomerAddressCompare(data) : "";
-        const filteredColumns = specialCustomerAddresses
-            ? columns.filter((column) => !["address", "store", "storeAddress", "store_address"].includes(column))
+        const specialAddressSection = depth === 0 ? renderEntityAddressSection(data) : "";
+        const filteredColumns = specialAddressSection
+            ? columns.filter((column) => !addressColumnsToHideForEntity().includes(column))
             : columns;
 
         return `
@@ -1470,22 +1477,56 @@
                         </div>
                     `).join("")}
                 </div>
-                ${specialCustomerAddresses}
+                ${specialAddressSection}
             </div>
         `;
     }
 
-    function isAddressObject(value) {
-        const parsed = safeParseJson(value);
-        if (!parsed || typeof parsed !== "object" || Array.isArray(parsed)) {
+    function addressColumnsToHideForEntity() {
+        if (entityKey === "customers") {
+            return ["address", "store", "storeAddress", "store_address"];
+        }
+        if (entityKey === "stores") {
+            return ["address", "manager"];
+        }
+        return [];
+    }
+
+    function isDirectAddressShape(value) {
+        if (!value || typeof value !== "object" || Array.isArray(value)) {
             return false;
         }
-        return ("address" in parsed) || ("district" in parsed) || ("postalCode" in parsed) || ("phone" in parsed) || ("address2" in parsed);
+        const hasLocationFields = ("district" in value) || ("postalCode" in value) || ("phone" in value) || ("address2" in value) || ("city" in value) || ("country" in value);
+        const hasAddressLine = typeof value.address === "string" || value.address === null;
+        return hasLocationFields || hasAddressLine;
     }
 
     function unwrapObject(value) {
         const parsed = safeParseJson(value);
         return parsed && typeof parsed === "object" && !Array.isArray(parsed) ? parsed : null;
+    }
+
+    function findAddressObject(value) {
+        const parsed = unwrapObject(value);
+        if (!parsed) {
+            return null;
+        }
+        if (isDirectAddressShape(parsed)) {
+            return parsed;
+        }
+
+        const nestedCandidates = ["address", "addressDto", "addressDTO", "storeAddress", "store_address"];
+        for (const key of nestedCandidates) {
+            const nested = unwrapObject(parsed[key]);
+            if (nested && isDirectAddressShape(nested)) {
+                return nested;
+            }
+        }
+        return null;
+    }
+
+    function isAddressObject(value) {
+        return !!findAddressObject(value);
     }
 
     function summarizeText(value) {
@@ -1500,7 +1541,7 @@
     }
 
     function buildAddressDisplay(addressValue) {
-        const address = unwrapObject(addressValue);
+        const address = findAddressObject(addressValue);
         if (!address) {
             return null;
         }
@@ -1598,6 +1639,60 @@
                 ${hasStoreAddress ? renderAddressCard("Store Address", storeAddress, storeSubtitleParts.join(" • ")) : ""}
             </section>
         `;
+    }
+
+    function renderStoreAddressCompare(data) {
+        if (!data || typeof data !== "object" || Array.isArray(data)) {
+            return "";
+        }
+
+        const storeAddress = data.address;
+        const manager = unwrapObject(data.manager);
+        const hasStoreAddress = isAddressObject(storeAddress);
+        const hasManager = !!manager;
+        if (!hasStoreAddress && !hasManager) {
+            return "";
+        }
+
+        return `
+            <section class="address-compare">
+                ${hasStoreAddress ? renderAddressCard("Store Address", storeAddress) : renderAddressPlaceholderCard("Store Address")}
+                ${hasManager ? renderManagerSummaryCard(manager) : ""}
+            </section>
+        `;
+    }
+
+    function renderManagerSummaryCard(manager) {
+        const fields = [
+            { label: "Staff ID", value: manager.staffId },
+            { label: "First Name", value: manager.firstName },
+            { label: "Last Name", value: manager.lastName },
+            { label: "Email", value: manager.email }
+        ];
+
+        const lines = fields
+            .filter((field) => !isEmptyValue(field.value))
+            .map((field) => `<div><strong>${escapeHtml(field.label)}:</strong> ${escapeHtml(summarizeText(field.value))}</div>`)
+            .join("");
+
+        return `
+            <article class="address-card">
+                <h3>Manager</h3>
+                <div class="address-lines">
+                    ${lines || '<div class="muted">Manager details not available</div>'}
+                </div>
+            </article>
+        `;
+    }
+
+    function renderEntityAddressSection(data) {
+        if (entityKey === "customers") {
+            return renderCustomerAddressCompare(data);
+        }
+        if (entityKey === "stores") {
+            return renderStoreAddressCompare(data);
+        }
+        return "";
     }
 
     function renderScalar(value) {
