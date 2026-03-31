@@ -409,6 +409,56 @@
             gap: 8px;
         }
 
+        .address-compare {
+            display: grid;
+            grid-template-columns: repeat(2, minmax(0, 1fr));
+            gap: 12px;
+            margin-bottom: 14px;
+        }
+
+        .address-card {
+            border: 1px solid #22262e;
+            border-radius: 12px;
+            padding: 14px;
+            background: #11141a;
+            min-width: 0;
+        }
+
+        .address-card h3 {
+            margin: 0 0 10px;
+            font-size: 0.95rem;
+            font-weight: 600;
+            color: #f3f4f6;
+        }
+
+        .address-lines {
+            display: grid;
+            gap: 6px;
+            color: #c4cad4;
+            font-size: 0.92rem;
+            line-height: 1.4;
+        }
+
+        .address-lines .muted {
+            color: #9ca3af;
+            font-size: 0.86rem;
+        }
+
+        .address-chip-row {
+            display: flex;
+            flex-wrap: wrap;
+            gap: 8px;
+            margin-top: 10px;
+        }
+
+        .address-chip {
+            padding: 6px 10px;
+            border-radius: 999px;
+            background: #20252d;
+            color: #d1d5db;
+            font-size: 0.84rem;
+        }
+
         @media (max-width: 920px) {
             .layout {
                 grid-template-columns: 1fr;
@@ -416,6 +466,10 @@
         }
 
         @media (max-width: 640px) {
+            .address-compare {
+                grid-template-columns: 1fr;
+            }
+
             .button-row {
                 flex-direction: column;
             }
@@ -1400,18 +1454,149 @@
             return '<div class="response-empty">Nothing to show.</div>';
         }
 
+        const specialCustomerAddresses = depth === 0 ? renderCustomerAddressCompare(data) : "";
+        const filteredColumns = specialCustomerAddresses
+            ? columns.filter((column) => !["address", "store", "storeAddress", "store_address"].includes(column))
+            : columns;
+
         return `
             <div class="response-stack">
                 ${renderSummary(["Showing 1 item"])}
                 <div class="detail-grid">
-                    ${columns.map((column) => `
+                    ${filteredColumns.map((column) => `
                         <div class="detail-card">
                             <strong>${escapeHtml(normalizeLabel(column))}</strong>
                             ${renderValue(data[column], depth + 1)}
                         </div>
                     `).join("")}
                 </div>
+                ${specialCustomerAddresses}
             </div>
+        `;
+    }
+
+    function isAddressObject(value) {
+        const parsed = safeParseJson(value);
+        if (!parsed || typeof parsed !== "object" || Array.isArray(parsed)) {
+            return false;
+        }
+        return ("address" in parsed) || ("district" in parsed) || ("postalCode" in parsed) || ("phone" in parsed) || ("address2" in parsed);
+    }
+
+    function unwrapObject(value) {
+        const parsed = safeParseJson(value);
+        return parsed && typeof parsed === "object" && !Array.isArray(parsed) ? parsed : null;
+    }
+
+    function summarizeText(value) {
+        const parsed = safeParseJson(value);
+        if (parsed === null || parsed === undefined || parsed === "") {
+            return "";
+        }
+        if (typeof parsed === "object") {
+            return formatValue(summarizeNestedLabel(parsed));
+        }
+        return formatValue(parsed);
+    }
+
+    function buildAddressDisplay(addressValue) {
+        const address = unwrapObject(addressValue);
+        if (!address) {
+            return null;
+        }
+
+        const cityObj = unwrapObject(address.city);
+        const city = cityObj ? (cityObj.city ?? cityObj.name ?? "") : summarizeText(address.city);
+        const countryObj = cityObj ? unwrapObject(cityObj.country) : null;
+        const country = countryObj ? (countryObj.country ?? countryObj.name ?? "") : summarizeText(cityObj ? cityObj.country : address.country);
+
+        const line1 = [address.address, address.address2].filter((item) => !isEmptyValue(item)).map((item) => summarizeText(item)).join(", ");
+        const line2 = [address.district, city, country].filter((item) => !isEmptyValue(item)).map((item) => summarizeText(item)).join(", ");
+
+        const postalCode = summarizeText(address.postalCode);
+        const phone = summarizeText(address.phone);
+
+        return {
+            line1: line1 || "",
+            line2: line2 || "",
+            postalCode: postalCode || "",
+            phone: phone || ""
+        };
+    }
+
+    function renderAddressCard(title, addressValue, subtitle = "") {
+        const display = buildAddressDisplay(addressValue);
+        if (!display) {
+            return "";
+        }
+
+        const chips = [];
+        if (display.postalCode) {
+            chips.push(`Postal Code: ${display.postalCode}`);
+        }
+        if (display.phone) {
+            chips.push(`Phone: ${display.phone}`);
+        }
+
+        return `
+            <article class="address-card">
+                <h3>${escapeHtml(title)}</h3>
+                <div class="address-lines">
+                    ${display.line1 ? `<div>${escapeHtml(display.line1)}</div>` : `<div class="muted">Address not available</div>`}
+                    ${display.line2 ? `<div>${escapeHtml(display.line2)}</div>` : ""}
+                    ${subtitle ? `<div class="muted">${escapeHtml(subtitle)}</div>` : ""}
+                </div>
+                ${chips.length ? `<div class="address-chip-row">${chips.map((chip) => `<span class="address-chip">${escapeHtml(chip)}</span>`).join("")}</div>` : ""}
+            </article>
+        `;
+    }
+
+    function renderAddressPlaceholderCard(title, subtitle = "", message = "Address not available") {
+        return `
+            <article class="address-card">
+                <h3>${escapeHtml(title)}</h3>
+                <div class="address-lines">
+                    <div class="muted">${escapeHtml(message)}</div>
+                    ${subtitle ? `<div class="muted">${escapeHtml(subtitle)}</div>` : ""}
+                </div>
+            </article>
+        `;
+    }
+
+    function renderCustomerAddressCompare(data) {
+        if (!data || typeof data !== "object" || Array.isArray(data)) {
+            return "";
+        }
+
+        // Customer result shape usually includes `address` and may include `store.address` (or similar).
+        const customerAddress = data.address;
+        const storeObj = unwrapObject(data.store);
+        const storeAddress = (storeObj && storeObj.address !== undefined)
+            ? storeObj.address
+            : ((storeObj && storeObj.addressDto !== undefined)
+                ? storeObj.addressDto
+                : ((storeObj && storeObj.addressDTO !== undefined)
+                    ? storeObj.addressDTO
+                    : (data.storeAddress ?? data.store_address ?? ((storeObj || !isEmptyValue(data.storeId)) ? { address: "" } : null))));
+
+        const hasCustomerAddress = isAddressObject(customerAddress);
+        const hasStoreAddress = isAddressObject(storeAddress);
+        if (!hasCustomerAddress && !hasStoreAddress) {
+            return "";
+        }
+
+        const storeSubtitleParts = [];
+        if (storeObj && !isEmptyValue(storeObj.storeId ?? storeObj.id)) {
+            storeSubtitleParts.push(`Store ID ${summarizeText(storeObj.storeId ?? storeObj.id)}`);
+        } else if (!isEmptyValue(data.storeId)) {
+            storeSubtitleParts.push(`Store ID ${summarizeText(data.storeId)}`);
+        }
+
+        return `
+            <section class="address-compare">
+                ${hasCustomerAddress ? renderAddressCard("Customer Address", customerAddress) : ""}
+                ${hasStoreAddress ? renderAddressCard("Store Address", storeAddress, storeSubtitleParts.join(" • ")) : ""}
+            </section>
         `;
     }
 
