@@ -69,20 +69,20 @@ public final class ExplorerCatalog {
                 "mafuj",
                 "Mafuj Gazi",
                 "/images/mafuj.jpeg",
-                "Customers and location data",
+                "Location reference data",
                 "#0b6e4f",
-                "Handles customer records together with the address, city, and country reference data they depend on.",
-                List.of("customers", "addresses", "cities", "countries")
+                "Maintains the address, city, and country reference data used by customer and store workflows.",
+                List.of("addresses", "cities", "countries")
         ));
 
         members.put("shreyash", new MemberDefinition(
                 "shreyash",
                 "Shreyash Singh",
                 "/images/shreyash.jpeg",
-                "Stores and inventory",
+                "Customers, stores, and inventory",
                 "#7a3e00",
-                "Owns store operations and inventory availability across locations.",
-                List.of("stores", "inventory")
+                "Owns customer records together with store operations and inventory availability across locations.",
+                List.of("customers", "stores", "inventory")
         ));
 
         members.put("utsav", new MemberDefinition(
@@ -208,7 +208,7 @@ public final class ExplorerCatalog {
         entities.put("customers", entity(
                 "customers",
                 "Customers",
-                "mafuj",
+                "shreyash",
                 "View, search, create, and update customer records.",
                 "CustomerRequestDTO",
                 List.of("storeId", "firstName", "lastName", "email", "addressId", "active", "createDate"),
