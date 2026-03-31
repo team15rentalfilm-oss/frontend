@@ -731,11 +731,6 @@
         }, new Set()));
     }
 
-    function shouldRenderAsCards(data) {
-        const columns = collectColumns(data);
-        return columns.length > 6 || data.some((row) => Object.values(row || {}).some((value) => hasNestedValue(value)));
-    }
-
     function pickCardTitle(row) {
         if (row.title) {
             return formatValue(row.title);
@@ -939,6 +934,94 @@
         `;
     }
 
+    function summarizeObjectForTable(value) {
+        if (!value || typeof value !== "object" || Array.isArray(value)) {
+            return value;
+        }
+
+        if (value.title !== undefined && value.title !== null && value.title !== "") {
+            return value.title;
+        }
+        if (value.name !== undefined && value.name !== null && value.name !== "") {
+            return value.name;
+        }
+        if (value.country !== undefined && value.country !== null && value.country !== "") {
+            return value.country;
+        }
+        if (value.city !== undefined && value.city !== null && value.city !== "") {
+            return value.city;
+        }
+        if ((value.firstName || value.lastName) && (value.firstName !== undefined || value.lastName !== undefined)) {
+            return [value.firstName, value.lastName].filter(Boolean).join(" ");
+        }
+
+        const identifier = Object.entries(value).find(([key, nestedValue]) =>
+            /id$/i.test(key) && nestedValue !== null && nestedValue !== undefined && nestedValue !== ""
+        );
+        if (identifier) {
+            return identifier[1];
+        }
+
+        return JSON.stringify(value);
+    }
+
+    function summarizeArrayForTable(value) {
+        if (!Array.isArray(value)) {
+            return value;
+        }
+        if (!value.length) {
+            return "None";
+        }
+
+        const summary = value
+            .slice(0, 4)
+            .map((item) => summarizeTableValue(item))
+            .map((item) => formatValue(item))
+            .join(", ");
+
+        return value.length > 4 ? `${summary}, +${value.length - 4} more` : summary;
+    }
+
+    function summarizeTableValue(value) {
+        const parsed = safeParseJson(value);
+        if (Array.isArray(parsed)) {
+            return summarizeArrayForTable(parsed);
+        }
+        if (parsed && typeof parsed === "object") {
+            return summarizeObjectForTable(parsed);
+        }
+        return parsed;
+    }
+
+    function normalizeTableRow(row, columns) {
+        return columns.reduce((normalized, column) => {
+            normalized[column] = summarizeTableValue(row ? row[column] : null);
+            return normalized;
+        }, {});
+    }
+
+    function renderObjectTable(data, depth = 0) {
+        const columns = Object.keys(data || {});
+        if (!columns.length) {
+            return '<div class="response-empty">No data returned.</div>';
+        }
+
+        return `
+            <div class="table-wrap">
+                <table>
+                    <thead>
+                        <tr>${columns.map((column) => `<th>${escapeHtml(normalizeLabel(column))}</th>`).join("")}</tr>
+                    </thead>
+                    <tbody>
+                        <tr>
+                            ${columns.map((column) => `<td>${renderValue(data[column], depth + 1)}</td>`).join("")}
+                        </tr>
+                    </tbody>
+                </table>
+            </div>
+        `;
+    }
+
     function renderScalar(value) {
         return `<div class="message-card"><p>${escapeHtml(formatValue(value))}</p></div>`;
     }
@@ -1006,16 +1089,8 @@
         if (isPagedResult(data)) {
             const pagination = extractPagination(data);
             responsePagination = pagination;
-            const summaryItems = [
-                data.number !== undefined ? `Page ${data.number + 1}` : null,
-                data.size !== undefined ? `Showing up to ${data.size} records` : null,
-                data.totalElements !== undefined ? `Total records ${data.totalElements}` : null,
-                data.totalPages !== undefined ? `Total pages ${data.totalPages}` : null
-            ].filter(Boolean);
-
             return `
                 <div class="response-stack">
-                    ${renderSummary(summaryItems)}
                     ${renderPaginationControls(pagination)}
                     ${renderArray(data.content || [], depth + 1)}
                     ${renderPaginationControls(pagination)}
@@ -1028,16 +1103,7 @@
             return '<div class="response-empty">No data returned.</div>';
         }
 
-        return `
-            <div class="detail-grid">
-                ${entries.map(([key, value]) => `
-                    <div class="detail-card">
-                        <strong>${escapeHtml(normalizeLabel(key))}</strong>
-                        ${renderValue(value, depth + 1)}
-                    </div>
-                `).join("")}
-            </div>
-        `;
+        return renderObjectTable(data, depth);
     }
 
     function renderArray(data, depth = 0) {
@@ -1055,30 +1121,22 @@
             `;
         }
 
-        if (shouldRenderAsCards(data)) {
-            return renderRecordCards(data, depth);
-        }
-
         const columns = collectColumns(data);
-
-        const summaryItems = depth === 0 ? [`Showing ${data.length} record${data.length === 1 ? "" : "s"}`] : [];
+        const normalizedRows = data.map((row) => normalizeTableRow(row, columns));
         return `
-            <div class="response-stack">
-                ${renderSummary(summaryItems)}
-                <div class="table-wrap">
-                    <table>
-                        <thead>
-                            <tr>${columns.map((column) => `<th>${escapeHtml(normalizeLabel(column))}</th>`).join("")}</tr>
-                        </thead>
-                        <tbody>
-                            ${data.map((row) => `
-                                <tr>
-                                    ${columns.map((column) => `<td>${renderValue(row[column], depth + 1)}</td>`).join("")}
-                                </tr>
-                            `).join("")}
-                        </tbody>
-                    </table>
-                </div>
+            <div class="table-wrap">
+                <table>
+                    <thead>
+                        <tr>${columns.map((column) => `<th>${escapeHtml(normalizeLabel(column))}</th>`).join("")}</tr>
+                    </thead>
+                    <tbody>
+                        ${normalizedRows.map((row) => `
+                            <tr>
+                                ${columns.map((column) => `<td>${renderValue(row[column], depth + 1)}</td>`).join("")}
+                            </tr>
+                        `).join("")}
+                    </tbody>
+                </table>
             </div>
         `;
     }
